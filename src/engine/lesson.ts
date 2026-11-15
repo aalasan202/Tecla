@@ -29,6 +29,8 @@ export interface LessonHost {
   now(): number;
   frame(cb: () => void): number;
   cancelFrame(id: number): void;
+  /** Nombre de una nota en la notación elegida (Do o C). */
+  name?(m: number): string;
 }
 
 /** Pulsos de cuenta atrás antes de Tocar. */
@@ -56,6 +58,7 @@ export class Lesson {
   private mistakes = 0;
   private extra = 0;
   private lastTick = -99;
+  private lastBeat = 0;
   private t0 = 0;
   private raf = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
@@ -98,6 +101,7 @@ export class Lesson {
     this.mistakes = 0;
     this.extra = 0;
     this.lastTick = -99;
+    this.lastBeat = 0;
     if (this.mode === "learn") {
       this.groups = groupByTime(this.active());
       if (!this.groups.length) return this.complete();
@@ -221,12 +225,14 @@ export class Lesson {
   }
 
   label(group: ScoreNote[]): string {
-    return group.map((n) => noteName(n.m) + (this.score.twoHands ? (n.h === "L" ? " (MI)" : " (MD)") : "")).join(" + ");
+    const name = (m: number) => this.host.name?.(m) ?? noteName(m);
+    return group.map((n) => name(n.m) + (this.score.twoHands ? (n.h === "L" ? " (MI)" : " (MD)") : "")).join(" + ");
   }
 
   private loop = (): void => {
     const { score, mode } = this;
     const beat = this.beat();
+    this.lastBeat = Math.max(this.lastBeat, beat);
     const x = STAFF_LEFT + beat * score.px + 16;
     this.host.playhead(x);
     this.host.scrollTo(x, false);
@@ -279,6 +285,12 @@ export class Lesson {
     this.stop();
     this.host.playhead(null);
     this.host.finish(this.result());
+  }
+
+  /** Fracción (0–1) de la pieza recorrida en el último intento. */
+  progress(): number {
+    if (this.mode === "learn") return this.groups.length ? Math.min(1, this.gi / this.groups.length) : 0;
+    return Math.min(1, Math.max(0, this.lastBeat / this.score.total));
   }
 
   result(): LessonResult {

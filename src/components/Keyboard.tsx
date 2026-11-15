@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { ScoreNote } from "../music/types";
 import type { KeyFlash } from "../engine/lesson";
-import { isWhite, noteName, octaveOf } from "../music/theory";
+import { isWhite, noteName, octaveOf, type Notation } from "../music/theory";
 
 export interface KeyboardHandle {
   flash(m: number, kind: KeyFlash, ms?: number): void;
@@ -12,6 +12,11 @@ interface Props {
   high: number;
   guide: ScoreNote[];
   onPress(m: number): void;
+  notation?: Notation;
+  /** Alto de las teclas en px (170 por defecto). */
+  height?: number;
+  /** Mostrar las letras del teclado del ordenador. */
+  letters?: boolean;
 }
 
 const WHITE_LETTERS = "asdfghjklñ";
@@ -34,7 +39,7 @@ export function keyboardRange(low: number, high: number): number[] {
   return whites;
 }
 
-export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ low, high, guide, onPress }, ref) {
+export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ low, high, guide, onPress, notation = "latin", height = 170, letters = true }, ref) {
   const whites = useMemo(() => keyboardRange(low, high), [low, high]);
   const keyEls = useRef(new Map<number, HTMLDivElement>());
   const press = useRef(onPress);
@@ -90,7 +95,7 @@ export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ lo
     <div className="kb-wrap">
       <div
         className="kb"
-        style={{ minWidth: whites.length * 34 }}
+        style={{ minWidth: whites.length * 34, height }}
         onPointerDown={(e) => {
           const key = (e.target as HTMLElement).closest<HTMLElement>(".key");
           if (!key) return;
@@ -100,8 +105,8 @@ export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ lo
       >
         {whites.map((m, i) => (
           <div key={m} ref={setRef(m)} data-m={m} className={`key ${m % 12 === 0 ? "c" : ""} ${guideClass.get(m) ?? ""}`}>
-            <span className="nm" data-o={octaveOf(m)}>{noteName(m)}</span>
-            {WHITE_LETTERS[i] && <span className="lt">{WHITE_LETTERS[i]}</span>}
+            <span className="nm" data-o={octaveOf(m)}>{noteName(m, notation)}</span>
+            {letters && WHITE_LETTERS[i] && <span className="lt">{WHITE_LETTERS[i]}</span>}
           </div>
         ))}
         {whites.map((m, i) =>
@@ -113,7 +118,7 @@ export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ lo
               className={`key black ${guideClass.get(m + 1) ?? ""}`}
               style={{ left: `calc(${(i + 1) * share}% - ${share * 0.32}%)`, width: `${share * 0.64}%` }}
             >
-              {BLACK_LETTERS[i] && <span className="lt">{BLACK_LETTERS[i]}</span>}
+              {letters && BLACK_LETTERS[i] && <span className="lt">{BLACK_LETTERS[i]}</span>}
             </div>
           ),
         )}

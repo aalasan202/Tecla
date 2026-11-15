@@ -10,7 +10,12 @@ export function staffStep(m: number): number {
   return Math.floor(w / 12) * 7 + WHITE_INDEX[w % 12];
 }
 
-export const noteName = (m: number): string => NOTE_NAMES[m % 12];
+export const NOTE_NAMES_EN = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+
+export type Notation = "latin" | "english";
+
+export const noteName = (m: number, notation: Notation = "latin"): string =>
+  (notation === "english" ? NOTE_NAMES_EN : NOTE_NAMES)[m % 12];
 
 export const octaveOf = (m: number): number => Math.floor(m / 12) - 1;
 

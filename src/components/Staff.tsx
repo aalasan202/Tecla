@@ -1,7 +1,7 @@
 import { forwardRef, memo, useImperativeHandle, useMemo, useRef } from "react";
 import type { Score, ScoreNote } from "../music/types";
 import type { NoteMark } from "../engine/lesson";
-import { isWhite, noteName, staffStep } from "../music/theory";
+import { isWhite, noteName, staffStep, type Notation } from "../music/theory";
 import { STAFF_LEFT } from "../music/score";
 
 /** Medio espacio entre líneas, en px. */
@@ -27,9 +27,10 @@ interface Props {
   autoIds: Set<number>;
   showNames: boolean;
   showFingers: boolean;
+  notation?: Notation;
 }
 
-export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, marks, autoIds, showNames, showFingers }, ref) {
+export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, marks, autoIds, showNames, showFingers, notation = "latin" }, ref) {
   const wrap = useRef<HTMLDivElement>(null);
   const head = useRef<SVGLineElement>(null);
 
@@ -117,6 +118,7 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
             labelY={labelRow[n.h]}
             showName={showNames}
             showFinger={showFingers}
+            notation={notation}
           />
         ))}
         <line ref={head} x1={0} x2={0} y1={top - 18} y2={bottom + 30} className="playhead" opacity={0} />
@@ -152,9 +154,10 @@ interface NoteProps {
   labelY: number;
   showName: boolean;
   showFinger: boolean;
+  notation: Notation;
 }
 
-const Note = memo(function Note({ note: n, mark, auto, accidental, labelY, showName, showFinger }: NoteProps) {
+const Note = memo(function Note({ note: n, mark, auto, accidental, labelY, showName, showFinger, notation }: NoteProps) {
   const left = n.h === "L";
   const s = staffStep(n.m);
   const x = n.x;
@@ -180,7 +183,7 @@ const Note = memo(function Note({ note: n, mark, auto, accidental, labelY, showN
         <path d={stemUp ? `M${sx} ${ey} q 3 9 10 14` : `M${sx} ${ey} q 3 -9 10 -14`} className="flag" />
       )}
       {(n.d === 1.5 || n.d === 3) && <circle cx={x + 13} cy={s % 2 ? y - H : y} r={2.2} className="dot-fill" />}
-      {showName && <text x={x} y={labelY} textAnchor="middle" className="lbl">{noteName(n.m)}</text>}
+      {showName && <text x={x} y={labelY} textAnchor="middle" className="lbl">{noteName(n.m, notation)}</text>}
       {showFinger && <text x={x} y={FINGER_ROW[n.h]} textAnchor="middle" className="fg">{n.f}</text>}
     </g>
   );

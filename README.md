@@ -13,18 +13,23 @@ npm test           # tests de la lógica musical y del motor de lecciones
 npm run build      # comprueba tipos y genera dist/
 ```
 
+En móvil y tablet la app funciona en horizontal; en vertical pide girar el dispositivo.
+
 Web MIDI solo funciona en Chrome o Edge y en páginas `https` o `localhost`.
 
 ## Estructura
 
 ```
 src/
+  screens/      Inicio, Canciones, Lección, Piano libre, Progreso y Ajustes
+  state/        ajustes y progreso guardados en el navegador
+  router.ts     rutas por hash (#canciones, #leccion/oda2, #piano…)
   music/        teoría (nombres, posiciones), canciones, partitura y digitación
   engine/       motor de lección (Escuchar / Aprender / Tocar), sin DOM
   audio/        sintetizador Web Audio
-  midi/         hook de Web MIDI
-  components/   Partitura (SVG) y Teclado
-  App.tsx       pantalla principal
+  midi/         Web MIDI: una conexión para toda la app (MidiProvider)
+  components/   Partitura (SVG), Teclado, barra superior, iconos
+  App.tsx       elige la pantalla según la ruta y aplica el tema
 prototype/      el prototipo original en un solo archivo, como referencia
 ```
 
