@@ -1,0 +1,6 @@
+Salamander Grand Piano V3, by Alexander Holm
+Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/)
+
+Muestras en MP3 (un nivel de intensidad, una cada 3 semitonos de A0 a C8) tal como las
+distribuye Tone.js en https://tonejs.github.io/audio/salamander/. Usadas en Tecla sin
+modificaciones; ver scripts/prepare-piano.mjs.

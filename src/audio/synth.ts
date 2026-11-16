@@ -1,6 +1,10 @@
 import { frequency } from "../music/theory";
+import { decodePiano, pianoState, playPiano } from "./piano";
 
-/** Sintetizador mínimo con Web Audio. Se sustituirá por muestras de piano reales. */
+/**
+ * Salida de audio de la app. Las notas suenan con el piano de muestras (piano.ts) cuando está
+ * cargado; mientras carga o si falla, con un sintetizador sencillo de reserva.
+ */
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 
@@ -16,13 +20,20 @@ export function ensureAudio(): AudioContext | null {
     comp.connect(ctx.destination);
   }
   if (ctx.state === "suspended") void ctx.resume();
+  decodePiano(ctx);
   return ctx;
 }
 
-/** Toca una nota con un timbre de piano sencillo (triangular + armónicos, filtro que se cierra). */
+/** Toca una nota: con el piano si está listo, si no con el sintetizador. */
 export function playTone(m: number, duration = 0.5, volume = 0.32): void {
   const a = ensureAudio();
   if (!a || !master) return;
+  if (pianoState() === "ready") playPiano(a, master, m, duration, volume);
+  else synthTone(a, master, m, duration, volume);
+}
+
+/** Sintetizador de reserva: triangular + armónicos, filtro que se cierra. */
+function synthTone(a: AudioContext, master: GainNode, m: number, duration: number, volume: number): void {
   const f = frequency(m);
   const t = a.currentTime;
   const end = t + Math.max(0.35, duration) + 0.7;

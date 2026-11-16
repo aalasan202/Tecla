@@ -33,6 +33,13 @@ export function SettingsScreen() {
             Probar el sonido
           </button>
         </div>
+        <p className="muted">
+          Sonido de piano: Salamander Grand Piano, de Alexander Holm (
+          <a href="https://creativecommons.org/licenses/by/3.0/deed.es" target="_blank" rel="noreferrer">
+            CC BY 3.0
+          </a>
+          ).
+        </p>
       </section>
 
       <section className="panel">
