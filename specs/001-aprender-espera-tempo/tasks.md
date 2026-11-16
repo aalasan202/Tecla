@@ -141,7 +141,7 @@ tocar → el acompañamiento se detiene en el mismo punto y sigue al tocarla.
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [X] T020 Ejecutar `npm test` y `npm run build`; confirmar que los tests existentes de Aprender y Tocar en `src/engine/lesson.test.ts` pasan sin modificar (SC-004)
-- [ ] T021 Recorrer la prueba manual de [quickstart.md](quickstart.md) (pasos 1–11) con `npm run dev`, incluidos teclado del ordenador, MIDI si hay, y vista de móvil apaisado sin desplazamiento (SC-006, FR-014)
+- [X] T021 Recorrer la prueba manual de [quickstart.md](quickstart.md) (pasos 1–11) con `npm run dev`, incluidos teclado del ordenador, MIDI si hay, y vista de móvil apaisado sin desplazamiento (SC-006, FR-014)
 - [X] T022 [P] Revisar `src/engine/lesson.ts`: el modo a tempo no importa nada del DOM ni de React (Principio I) y la rama de Aprender sin `atTempo` no ha cambiado
 - [X] T023 [P] Marcar «Aprender con espera a tempo» como hecho en la sección v0.4 de `old_docs/ROADMAP.md` (o en la hoja de ruta vigente si se ha movido)
 
