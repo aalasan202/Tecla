@@ -33,6 +33,11 @@ export interface LessonHost {
   name?(m: number): string;
 }
 
+export interface LessonOptions {
+  /** Solo en Aprender: la partitura avanza a tempo y espera las notas pendientes. */
+  atTempo?: boolean;
+}
+
 /** Pulsos de cuenta atrás antes de Tocar. */
 export const COUNT_IN = 4;
 /** Ventana (en pulsos) para aceptar una nota en Tocar, y para considerarla "perfecta". */
@@ -52,6 +57,8 @@ interface Runtime {
  */
 export class Lesson {
   running = false;
+  /** Aprender a tempo (ver LessonOptions). */
+  readonly atTempo: boolean;
   private rt: Runtime[] = [];
   private groups: ScoreNote[][] = [];
   private gi = 0;
@@ -60,6 +67,9 @@ export class Lesson {
   private lastTick = -99;
   private lastBeat = 0;
   private t0 = 0;
+  /** Aprender a tempo: posición del cursor en pulsos y hora del último fotograma. */
+  private pos = 0;
+  private lastFrame = 0;
   private raf = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -69,7 +79,9 @@ export class Lesson {
     readonly hands: HandChoice,
     public tempo: number,
     private host: LessonHost,
+    options: LessonOptions = {},
   ) {
+    this.atTempo = mode === "learn" && options.atTempo === true;
     this.reset();
   }
 
@@ -105,6 +117,13 @@ export class Lesson {
     if (this.mode === "learn") {
       this.groups = groupByTime(this.active());
       if (!this.groups.length) return this.complete();
+      if (this.atTempo) {
+        this.pos = 0;
+        this.lastFrame = this.host.now();
+        this.markPending();
+        this.loopLearnTempo();
+        return;
+      }
       const first = this.groups[0][0].s;
       const accompanimentFirst = first > 0 && this.score.notes.some((n) => this.rt[n.id].auto && n.s < first);
       if (accompanimentFirst) {
@@ -144,6 +163,12 @@ export class Lesson {
       this.host.flash(m, "ok");
       this.host.mark(hit.id, "hit");
       if (group.every((n) => this.rt[n.id].done)) {
+        if (this.atTempo) {
+          // el bucle mueve el cursor, hace sonar el acompañamiento y termina la pieza
+          this.gi++;
+          this.markPending();
+          return;
+        }
         const from = group[0].s;
         this.gi++;
         const to = this.gi < this.groups.length ? this.groups[this.gi][0].s : this.score.total;
@@ -158,7 +183,7 @@ export class Lesson {
       this.host.tone(m, 0.3, 0.22);
       this.mistakes++;
       this.host.flash(m, "wrong", 350);
-      this.learnStatus();
+      if (!this.atTempo) this.learnStatus();
     } else this.host.tone(m, 0.3);
   }
 
@@ -223,6 +248,48 @@ export class Lesson {
     const next = this.gi < total ? `Toca: ${this.label(this.groups[this.gi])}` : "";
     this.host.status(`Paso ${step} de ${total} · ${this.mistakes} ${this.mistakes === 1 ? "fallo" : "fallos"}`, next);
   }
+
+  /** Aprender a tempo: resalta y guía el grupo pendiente (o limpia la guía si no queda). */
+  private markPending(): void {
+    const g = this.groups[this.gi];
+    if (!g) return this.host.guide([]);
+    g.forEach((n) => this.host.mark(n.id, "now"));
+    this.host.guide(g.filter((n) => !this.rt[n.id].done));
+  }
+
+  /**
+   * Aprender a tempo: el cursor avanza al tempo vigente y se detiene en el pulso de la primera
+   * nota pendiente. El acompañamiento solo suena por detrás de esa nota.
+   */
+  private loopLearnTempo = (): void => {
+    const { score } = this;
+    const now = this.host.now();
+    const pending = this.gi < this.groups.length ? this.groups[this.gi][0].s : Infinity;
+    this.pos = Math.min(this.pos + Math.max(0, now - this.lastFrame) / 1000 / this.spb, pending);
+    this.lastFrame = now;
+    const x = STAFF_LEFT + this.pos * score.px + 16;
+    this.host.playhead(x);
+    this.host.scrollTo(x, false);
+
+    for (const n of score.notes) {
+      const r = this.rt[n.id];
+      if (r.auto && !r.played && n.s <= this.pos && n.s < pending) {
+        r.played = true;
+        this.sound(n);
+        this.host.mark(n.id, "now");
+        this.later(() => this.host.mark(n.id, null), n.d * this.spb * 900);
+      }
+    }
+
+    const measures = score.total / score.bar;
+    const measure = Math.min(Math.floor(this.pos / score.bar) + 1, measures);
+    const fails = `${this.mistakes} ${this.mistakes === 1 ? "fallo" : "fallos"}`;
+    const next = this.gi < this.groups.length ? `Toca: ${this.label(this.groups[this.gi])}` : "";
+    this.host.status(`Compás ${measure} de ${measures} · ${fails}`, next);
+
+    if (this.gi >= this.groups.length && this.pos > score.total + 0.6) return this.complete();
+    this.raf = this.host.frame(this.loopLearnTempo);
+  };
 
   label(group: ScoreNote[]): string {
     const name = (m: number) => this.host.name?.(m) ?? noteName(m);

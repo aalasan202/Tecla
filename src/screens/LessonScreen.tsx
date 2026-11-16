@@ -26,6 +26,10 @@ const HINTS: Record<Mode, [string, string]> = {
     "Toca a tempo. Si eliges una sola mano, la otra suena sola para acompañarte.",
   ],
 };
+const LEARN_AT_TEMPO_HINTS: [string, string] = [
+  "La partitura avanza a tempo y se detiene en la nota hasta que la toques.",
+  "La partitura avanza a tempo y se detiene en la nota hasta que la toques. Si eliges una sola mano, la otra suena y espera contigo.",
+];
 const MODES: [Mode, string][] = [["listen", "Escuchar"], ["learn", "Aprender"], ["play", "Tocar"]];
 
 export function LessonScreen({ songId }: { songId: string }) {
@@ -107,7 +111,7 @@ function LessonView({ songId }: { songId: string }) {
         saveAttempt(l);
         if (r.mode === "play" && (!score.twoHands || hands === "both")) recordStars(songId, r.stars);
       },
-    });
+    }, { atTempo: prefs.learnAtTempo });
     lesson.current = l;
     staff.current?.scrollTo(0, false);
     return () => {
@@ -118,7 +122,7 @@ function LessonView({ songId }: { songId: string }) {
     };
     // el tempo no reinicia la lección; resume solo se lee al entrar
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [score, mode, hands]);
+  }, [score, mode, hands, prefs.learnAtTempo]);
 
   useEffect(() => {
     if (lesson.current) lesson.current.tempo = tempo;
@@ -184,7 +188,7 @@ function LessonView({ songId }: { songId: string }) {
           </button>
         ))}
       </div>
-      <p className="hint">{HINTS[mode][score.twoHands ? 1 : 0]}</p>
+      <p className="hint">{(mode === "learn" && prefs.learnAtTempo ? LEARN_AT_TEMPO_HINTS : HINTS[mode])[score.twoHands ? 1 : 0]}</p>
 
       <div className="board">
         <Staff
@@ -206,7 +210,12 @@ function LessonView({ songId }: { songId: string }) {
         <button className="btn primary" onClick={toggleRun}>
           {running ? "Parar" : "Empezar"}
         </button>
-        <label className="field" style={{ visibility: mode === "learn" ? "hidden" : "visible" }}>
+        {mode === "learn" && (
+          <label className="field">
+            <input type="checkbox" checked={prefs.learnAtTempo} onChange={(e) => settings.set({ learnAtTempo: e.target.checked })} /> A tempo
+          </label>
+        )}
+        <label className="field" style={{ visibility: mode === "learn" && !prefs.learnAtTempo ? "hidden" : "visible" }}>
           Tempo
           <input type="range" min={40} max={140} step={5} value={tempo} onChange={(e) => setTempo(Number(e.target.value))} />
           <output>{tempo}</output> ppm

@@ -9,6 +9,8 @@ export interface Settings {
   showNames: boolean;
   showFingers: boolean;
   theme: Theme;
+  /** Aprender a tempo: la partitura avanza sola y espera la nota pendiente. */
+  learnAtTempo: boolean;
 }
 
 export const settings = createStore<Settings>("tecla-settings", {
@@ -16,4 +18,5 @@ export const settings = createStore<Settings>("tecla-settings", {
   showNames: true,
   showFingers: false,
   theme: "auto",
+  learnAtTempo: false,
 });
