@@ -3,6 +3,7 @@ import { useMidiContext } from "../midi/MidiProvider";
 import { MIDI_HELP } from "../midi/useMidi";
 import { ensureAudio } from "../audio/synth";
 import { goBack, type Route } from "../router";
+import { usePwaStatus } from "../pwa/sw";
 import { IconBack, IconSettings } from "./Icons";
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export function TopBar({ title, back, showSettings = true }: Props) {
   const midi = useMidiContext();
+  const { online } = usePwaStatus();
   const label =
     midi.status === "ok"
       ? `MIDI: ${midi.devices.join(", ")}`
@@ -44,6 +46,12 @@ export function TopBar({ title, back, showSettings = true }: Props) {
           )}
         </div>
         <div className="top-right">
+          {!online && (
+            <span className="chip offline" role="status" aria-label="Sin conexión">
+              <span className="chip-dot" aria-hidden="true" />
+              <span className="chip-text">Sin conexión</span>
+            </span>
+          )}
           <button
             type="button"
             className={`chip ${midi.status === "ok" ? "on" : midi.status === "idle" ? "" : "warn"}`}

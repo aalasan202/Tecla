@@ -9,6 +9,7 @@ import { FreePiano } from "./screens/FreePiano";
 import { ProgressScreen } from "./screens/ProgressScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { IconRotate } from "./components/Icons";
+import { PwaToast } from "./components/PwaToast";
 
 export default function App() {
   const route = useRoute();
@@ -49,6 +50,7 @@ export default function App() {
   return (
     <MidiProvider>
       <div className="app">{screen}</div>
+      <PwaToast route={route} />
       <div className="rotate">
         <span className="rotate-brand">Tecla</span>
         <IconRotate />

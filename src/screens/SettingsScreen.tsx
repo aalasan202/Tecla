@@ -6,11 +6,15 @@ import { MIDI_HELP } from "../midi/useMidi";
 import { ensureAudio, playTone } from "../audio/synth";
 import type { Notation } from "../music/theory";
 import { TopBar } from "../components/TopBar";
+import { offlineSupported, usePwaStatus } from "../pwa/sw";
+import { promptInstall, useInstallOption } from "../pwa/install";
 
 export function SettingsScreen() {
   const s = settings.use();
   const midi = useMidiContext();
   const [confirmReset, setConfirmReset] = useState(false);
+  const { offlineReady } = usePwaStatus();
+  const install = useInstallOption();
 
   return (
     <div className="screen">
@@ -37,6 +41,10 @@ export function SettingsScreen() {
           Sonido de piano: Salamander Grand Piano, de Alexander Holm (
           <a href="https://creativecommons.org/licenses/by/3.0/deed.es" target="_blank" rel="noreferrer">
             CC BY 3.0
+          </a>
+          ). Fuentes: Bricolage Grotesque, Figtree y Noto Music (
+          <a href="https://openfontlicense.org" target="_blank" rel="noreferrer">
+            SIL Open Font License
           </a>
           ).
         </p>
@@ -88,9 +96,32 @@ export function SettingsScreen() {
         </fieldset>
       </section>
 
+      {install !== "installed" && (
+        <section className="panel">
+          <h2>Instalar Tecla</h2>
+          {install === "button" ? (
+            <>
+              <p>Ábrela desde un icono, en su propia ventana y sin conexión.</p>
+              <div className="row">
+                <button className="btn primary" onClick={() => void promptInstall()}>
+                  Instalar
+                </button>
+              </div>
+            </>
+          ) : install === "ios-instructions" ? (
+            <p>En iPhone o iPad: pulsa Compartir y luego «Añadir a pantalla de inicio».</p>
+          ) : (
+            <p>Este navegador no permite instalar apps, pero Tecla funciona sin conexión.</p>
+          )}
+        </section>
+      )}
+
       <section className="panel">
         <h2>Datos</h2>
         <p className="muted">El progreso se guarda solo en este navegador.</p>
+        {offlineSupported() && (
+          <p className="muted">Disponible sin conexión: {offlineReady ? "sí" : "preparando…"}</p>
+        )}
         {confirmReset ? (
           <div className="row">
             <span>¿Borrar estrellas, racha y tiempo de práctica?</span>

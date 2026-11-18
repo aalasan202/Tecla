@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Tecla: tres teclas blancas y dos negras sobre el azul de la marca; el dibujo cabe en el 80 % central (icono maskable) -->
+  <rect width="512" height="512" fill="#3a4edf"/>
+  <g fill="#fff">
+    <rect x="138" y="140" width="72" height="232" rx="14"/>
+    <rect x="220" y="140" width="72" height="232" rx="14"/>
+    <rect x="302" y="140" width="72" height="232" rx="14"/>
+  </g>
+  <g fill="#151b2c">
+    <rect x="191" y="140" width="48" height="138" rx="9"/>
+    <rect x="273" y="140" width="48" height="138" rx="9"/>
+  </g>
+</svg>

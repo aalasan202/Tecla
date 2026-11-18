@@ -303,4 +303,19 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .song-list a { color: var(--ink); font-weight: 600; text-decoration: none; }
 .song-list a:hover { color: var(--accent); }
 
+/* ---------- sin conexión y avisos de la app ---------- */
+.chip.offline { cursor: default; color: var(--warm-ink); border-color: var(--warm); background: var(--warm-soft); }
+.chip.offline .chip-dot { background: var(--warm); }
+/* móvil apaisado: solo el punto, para no quitar sitio a la partitura */
+@media (max-height: 500px) { .chip.offline { padding: 0 18px; } .chip.offline .chip-text { display: none; } }
+.toast {
+  position: fixed; z-index: 10; left: 50%; transform: translateX(-50%);
+  bottom: max(16px, env(safe-area-inset-bottom)); width: max-content; max-width: calc(100vw - 32px);
+  display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 18px; border-radius: 14px;
+  background: var(--ink); color: var(--bg); box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); font-weight: 600; font-size: 15px;
+}
+.toast .btn { min-height: 36px; padding: 6px 14px; }
+.toast .btn.ghost { background: transparent; border-color: transparent; color: inherit; }
+.toast-close { width: 36px; height: 36px; flex: none; border: 0; border-radius: 10px; background: transparent; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
