@@ -33,9 +33,25 @@ export interface LessonHost {
   name?(m: number): string;
 }
 
+/** Fragmento que se repite en bucle: compases de inicio y fin, base 0, inclusivos. */
+export interface LoopRange {
+  from: number;
+  to: number;
+}
+
+/** Resumen de una práctica en bucle, al pararla. */
+export interface LoopSummary {
+  /** Repeticiones completas. */
+  reps: number;
+  best: LessonResult;
+  last: LessonResult;
+}
+
 export interface LessonOptions {
   /** Solo en Aprender: la partitura avanza a tempo y espera las notas pendientes. */
   atTempo?: boolean;
+  /** Repite solo estos compases, indefinidamente, en cualquier paso. */
+  loop?: LoopRange;
 }
 
 /** Pulsos de cuenta atrás antes de Tocar. */
@@ -43,6 +59,10 @@ export const COUNT_IN = 4;
 /** Ventana (en pulsos) para aceptar una nota en Tocar, y para considerarla "perfecta". */
 export const HIT_WINDOW = 0.45;
 export const PERFECT_WINDOW = 0.18;
+/** Con bucle en Tocar, la repetición se cierra este margen (en pulsos) tras el final del fragmento. */
+const LOOP_CLOSE = HIT_WINDOW + 0.15;
+
+const EMPTY_FRAGMENT: [string, string] = ["No hay notas de esta mano en el fragmento", "Elige otros compases u otra mano"];
 
 interface Runtime {
   auto: boolean;
@@ -54,11 +74,17 @@ interface Runtime {
 /**
  * Motor de una lección: Escuchar (la pieza suena sola), Aprender (espera cada nota)
  * y Tocar (a tempo, con puntuación). No toca el DOM: todo pasa por LessonHost.
+ * Con `options.loop`, cualquiera de los tres pasos repite solo ese fragmento hasta `stop()`.
  */
 export class Lesson {
   running = false;
   /** Aprender a tempo (ver LessonOptions). */
   readonly atTempo: boolean;
+  /** Fragmento en bucle, ya ordenado y recortado a la pieza; null sin bucle. */
+  readonly loop: LoopRange | null;
+  /** Pulsos donde empieza y acaba lo que se practica (la pieza entera sin bucle). */
+  private readonly start0: number;
+  private readonly end: number;
   private rt: Runtime[] = [];
   private groups: ScoreNote[][] = [];
   private gi = 0;
@@ -70,6 +96,10 @@ export class Lesson {
   /** Aprender a tempo: posición del cursor en pulsos y hora del último fotograma. */
   private pos = 0;
   private lastFrame = 0;
+  /** Bucle: repetición en curso (desde 1), repeticiones cerradas y sus resultados. */
+  private rep = 1;
+  private closed = 0;
+  private reps: LessonResult[] = [];
   private raf = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -82,6 +112,9 @@ export class Lesson {
     options: LessonOptions = {},
   ) {
     this.atTempo = mode === "learn" && options.atTempo === true;
+    this.loop = options.loop ? normalizeLoop(options.loop, score.total / score.bar) : null;
+    this.start0 = this.loop ? this.loop.from * score.bar : 0;
+    this.end = this.loop ? (this.loop.to + 1) * score.bar : score.total;
     this.reset();
   }
 
@@ -94,8 +127,13 @@ export class Lesson {
     return this.score.twoHands && this.hands !== "both" && n.h !== this.hands;
   }
 
+  /** La nota empieza dentro de lo que se practica (siempre cierto sin bucle). */
+  private inRange(n: ScoreNote): boolean {
+    return n.s >= this.start0 && n.s < this.end;
+  }
+
   private active(): ScoreNote[] {
-    return this.score.notes.filter((n) => !this.rt[n.id].auto);
+    return this.score.notes.filter((n) => !this.rt[n.id].auto && this.inRange(n));
   }
 
   reset(): void {
@@ -108,33 +146,34 @@ export class Lesson {
   start(): void {
     this.stop();
     this.reset();
-    this.running = true;
     this.gi = 0;
     this.mistakes = 0;
     this.extra = 0;
     this.lastTick = -99;
     this.lastBeat = 0;
+    this.rep = 1;
+    this.closed = 0;
+    this.reps = [];
+    if (this.loop && this.mode !== "listen" && !this.active().length) {
+      this.host.status(...EMPTY_FRAGMENT);
+      return;
+    }
+    this.running = true;
     if (this.mode === "learn") {
       this.groups = groupByTime(this.active());
       if (!this.groups.length) return this.complete();
       if (this.atTempo) {
-        this.pos = 0;
+        this.pos = this.start0;
         this.lastFrame = this.host.now();
         this.markPending();
         this.loopLearnTempo();
         return;
       }
-      const first = this.groups[0][0].s;
-      const accompanimentFirst = first > 0 && this.score.notes.some((n) => this.rt[n.id].auto && n.s < first);
-      if (accompanimentFirst) {
-        this.playAutos(0, first);
-        this.host.status("Escucha la otra mano…", "");
-        this.later(() => this.showGroup(), first * this.spb * 1000);
-      } else this.showGroup();
+      this.learnFrom();
       return;
     }
     this.t0 = this.host.now() + (this.mode === "listen" ? 300 : 0);
-    this.loop();
+    this.loop_();
   }
 
   stop(): void {
@@ -171,10 +210,11 @@ export class Lesson {
         }
         const from = group[0].s;
         this.gi++;
-        const to = this.gi < this.groups.length ? this.groups[this.gi][0].s : this.score.total;
+        const to = this.gi < this.groups.length ? this.groups[this.gi][0].s : this.end;
         this.playAutos(from, to);
         if (this.gi >= this.groups.length) {
-          this.later(() => this.complete(), Math.max(300, (to - from) * this.spb * 1000));
+          const wait = Math.max(300, (to - from) * this.spb * 1000);
+          this.later(() => (this.loop ? this.nextRepetition() : this.complete()), wait);
           return;
         }
         this.showGroup();
@@ -189,7 +229,7 @@ export class Lesson {
 
   private inputPlay(m: number): void {
     this.host.tone(m, 0.4);
-    const beat = this.beat();
+    const beat = this.loop ? this.where().b : this.beat();
     let best: ScoreNote | null = null;
     let bestDist = Infinity;
     for (const n of this.active()) {
@@ -214,24 +254,93 @@ export class Lesson {
     return (this.host.now() - this.t0) / 1000 / this.spb - (this.mode === "play" ? COUNT_IN : 0);
   }
 
+  /** Bucle en Escuchar/Tocar: período en pulsos (en Tocar, con un compás de descanso). */
+  private get period(): number {
+    const len = this.end - this.start0;
+    return this.mode === "play" ? len + this.score.bar : len;
+  }
+
+  /**
+   * Bucle en Escuchar/Tocar: `g` pulsos desde el comienzo, vuelta `k`, posición `local` dentro
+   * de la vuelta y pulso `b` de la partitura con el que se comparan las notas. Cerrada la
+   * repetición `k` (ya en el descanso), `b` mira a la siguiente: queda antes de `start`.
+   */
+  private where(): { g: number; k: number; local: number; b: number } {
+    const g = this.beat();
+    if (g < 0) return { g, k: -1, local: g, b: this.start0 + g };
+    const k = Math.floor(g / this.period);
+    const local = g - k * this.period;
+    return { g, k, local, b: this.start0 + (this.closed > k ? local - this.period : local) };
+  }
+
   private later(fn: () => void, ms: number): void {
     this.timers.push(setTimeout(fn, ms));
   }
 
   private sound(n: ScoreNote): void {
-    this.host.tone(n.m, n.d * this.spb * 0.95, n.h === "L" ? 0.26 : 0.32);
-    this.host.flash(n.m, "down", Math.min(n.d * this.spb * 900, 700));
+    // con bucle, nada suena más allá del final del fragmento
+    const d = Math.min(n.d, this.end - n.s) * this.spb;
+    this.host.tone(n.m, d * 0.95, n.h === "L" ? 0.26 : 0.32);
+    this.host.flash(n.m, "down", Math.min(d * 900, 700));
   }
 
   private playAutos(from: number, to: number): void {
     for (const n of this.score.notes) {
-      if (!this.rt[n.id].auto || n.s < from || n.s >= to) continue;
+      if (!this.rt[n.id].auto || !this.inRange(n) || n.s < from || n.s >= to) continue;
       this.later(() => {
         this.sound(n);
         this.host.mark(n.id, "now");
         this.later(() => this.host.mark(n.id, null), n.d * this.spb * 900);
       }, (n.s - from) * this.spb * 1000);
     }
+  }
+
+  /** Aprender (espera libre): empieza por el primer grupo, o deja sonar antes la otra mano. */
+  private learnFrom(): void {
+    const first = this.groups[0][0].s;
+    const accompanimentFirst =
+      first > this.start0 && this.score.notes.some((n) => this.rt[n.id].auto && this.inRange(n) && n.s < first);
+    if (accompanimentFirst) {
+      this.playAutos(this.start0, first);
+      this.host.status("Escucha la otra mano…", "");
+      this.later(() => this.showGroup(), (first - this.start0) * this.spb * 1000);
+    } else this.showGroup();
+  }
+
+  /** Bucle: cierra la repetición en curso y deja el fragmento listo para la siguiente. */
+  private nextRepetition(): void {
+    if (this.mode !== "listen") this.reps.push(this.result());
+    this.rep++;
+    for (const n of this.score.notes) {
+      if (!this.inRange(n)) continue;
+      const r = this.rt[n.id];
+      r.played = false;
+      r.done = false;
+      r.judged = null;
+      this.host.mark(n.id, null);
+    }
+    this.mistakes = 0;
+    this.extra = 0;
+    this.gi = 0;
+    if (this.mode === "learn") {
+      if (this.atTempo) {
+        this.pos = this.start0;
+        this.markPending();
+      } else this.learnFrom();
+    }
+  }
+
+  /** Bucle: «Repetición k · » y, desde la 2.ª, el resultado de la anterior (no en Escuchar). */
+  private repPrefix(): string {
+    if (!this.loop) return "";
+    const last = this.reps[this.reps.length - 1];
+    const prev = last && last.score !== null ? ` · anterior ${Math.round(last.score * 100)} %` : "";
+    return `Repetición ${this.rep}${prev} · `;
+  }
+
+  private measureLabel(beat: number): string {
+    const measures = this.score.total / this.score.bar;
+    return `Compás ${Math.min(Math.floor(Math.max(beat, 0) / this.score.bar) + 1, measures)} de ${measures}`;
   }
 
   private showGroup(): void {
@@ -246,7 +355,8 @@ export class Lesson {
     const total = this.groups.length;
     const step = Math.min(this.gi + 1, total);
     const next = this.gi < total ? `Toca: ${this.label(this.groups[this.gi])}` : "";
-    this.host.status(`Paso ${step} de ${total} · ${this.mistakes} ${this.mistakes === 1 ? "fallo" : "fallos"}`, next);
+    const fails = `${this.mistakes} ${this.mistakes === 1 ? "fallo" : "fallos"}`;
+    this.host.status(`${this.repPrefix()}Paso ${step} de ${total} · ${fails}`, next);
   }
 
   /** Aprender a tempo: resalta y guía el grupo pendiente (o limpia la guía si no queda). */
@@ -267,13 +377,15 @@ export class Lesson {
     const pending = this.gi < this.groups.length ? this.groups[this.gi][0].s : Infinity;
     this.pos = Math.min(this.pos + Math.max(0, now - this.lastFrame) / 1000 / this.spb, pending);
     this.lastFrame = now;
+    if (this.loop && this.gi >= this.groups.length && this.pos >= this.end) this.nextRepetition();
     const x = STAFF_LEFT + this.pos * score.px + 16;
     this.host.playhead(x);
     this.host.scrollTo(x, false);
 
+    const limit = this.gi < this.groups.length ? this.groups[this.gi][0].s : Infinity;
     for (const n of score.notes) {
       const r = this.rt[n.id];
-      if (r.auto && !r.played && n.s <= this.pos && n.s < pending) {
+      if (r.auto && !r.played && this.inRange(n) && n.s <= this.pos && n.s < limit) {
         r.played = true;
         this.sound(n);
         this.host.mark(n.id, "now");
@@ -281,13 +393,11 @@ export class Lesson {
       }
     }
 
-    const measures = score.total / score.bar;
-    const measure = Math.min(Math.floor(this.pos / score.bar) + 1, measures);
     const fails = `${this.mistakes} ${this.mistakes === 1 ? "fallo" : "fallos"}`;
     const next = this.gi < this.groups.length ? `Toca: ${this.label(this.groups[this.gi])}` : "";
-    this.host.status(`Compás ${measure} de ${measures} · ${fails}`, next);
+    this.host.status(`${this.repPrefix()}${this.measureLabel(this.pos)} · ${fails}`, next);
 
-    if (this.gi >= this.groups.length && this.pos > score.total + 0.6) return this.complete();
+    if (!this.loop && this.gi >= this.groups.length && this.pos > score.total + 0.6) return this.complete();
     this.raf = this.host.frame(this.loopLearnTempo);
   };
 
@@ -296,17 +406,45 @@ export class Lesson {
     return group.map((n) => name(n.m) + (this.score.twoHands ? (n.h === "L" ? " (MI)" : " (MD)") : "")).join(" + ");
   }
 
-  private loop = (): void => {
+  /** Bucle de fotogramas de Escuchar y Tocar. */
+  private loop_ = (): void => {
     const { score, mode } = this;
-    const beat = this.beat();
+    let beat: number;
+    let cursor: number;
+    let resting = false;
+    let restLeft = 0;
+    let strong: boolean;
+    let g: number;
+    if (this.loop) {
+      let w = this.where();
+      if (w.k >= 0) {
+        // Escuchar cierra al empezar cada vuelta; Tocar, ya dentro del compás de descanso
+        const len = this.end - this.start0;
+        if (w.k > this.closed || (mode === "play" && w.k === this.closed && w.local >= len + LOOP_CLOSE)) {
+          this.nextRepetition();
+          this.closed = mode === "play" && w.local >= len + LOOP_CLOSE ? w.k + 1 : w.k;
+          w = this.where();
+        }
+        resting = mode === "play" && w.local >= len;
+        restLeft = Math.ceil(this.period - w.local);
+      }
+      g = w.g;
+      beat = w.b;
+      cursor = w.g < 0 || resting ? this.start0 : w.b;
+      strong = w.k < 0 ? (((Math.floor(g) % score.bar) + score.bar) % score.bar) === 0 : Math.floor(w.local) % score.bar === 0;
+    } else {
+      g = beat = cursor = this.beat();
+      const bi = Math.floor(beat);
+      strong = ((bi % score.bar) + score.bar) % score.bar === 0;
+    }
     this.lastBeat = Math.max(this.lastBeat, beat);
-    const x = STAFF_LEFT + beat * score.px + 16;
+    const x = STAFF_LEFT + cursor * score.px + 16;
     this.host.playhead(x);
     this.host.scrollTo(x, false);
 
     for (const n of score.notes) {
       const r = this.rt[n.id];
-      if ((mode === "listen" || r.auto) && !r.played && beat >= n.s) {
+      if ((mode === "listen" || r.auto) && !r.played && this.inRange(n) && beat >= n.s) {
         r.played = true;
         this.sound(n);
         this.host.mark(n.id, "now");
@@ -317,10 +455,10 @@ export class Lesson {
     }
 
     if (mode === "play") {
-      const bi = Math.floor(beat);
-      if (bi > this.lastTick && bi < score.total) {
+      const bi = Math.floor(g);
+      if (bi > this.lastTick && (this.loop || bi < score.total)) {
         this.lastTick = bi;
-        this.host.click(((bi % score.bar) + score.bar) % score.bar === 0);
+        this.host.click(strong);
       }
       const act = this.active();
       for (const n of act) {
@@ -334,18 +472,20 @@ export class Lesson {
       const first = pending.length ? Math.min(...pending.map((n) => n.s)) : null;
       const upcoming = pending.filter((n) => n.s === first);
       this.host.guide(upcoming);
+      const hits = act.filter((n) => this.rt[n.id].judged && this.rt[n.id].judged !== "miss").length;
       const text =
-        beat < 0
-          ? `Preparados… ${-Math.floor(beat)}`
-          : `Aciertos ${act.filter((n) => this.rt[n.id].judged && this.rt[n.id].judged !== "miss").length} de ${act.length}`;
+        g < 0
+          ? `Preparados… ${-Math.floor(g)}`
+          : resting
+            ? `Otra vez… ${restLeft}`
+            : `${this.repPrefix()}Aciertos ${hits} de ${act.length}`;
       this.host.status(text, upcoming.length ? `Siguiente: ${this.label(upcoming)}` : "");
     } else {
-      const measures = score.total / score.bar;
-      this.host.status(`Compás ${Math.min(Math.floor(Math.max(beat, 0) / score.bar) + 1, measures)} de ${measures}`, "");
+      this.host.status(`${this.repPrefix()}${this.measureLabel(beat)}`, "");
     }
 
-    if (beat > score.total + 0.6) return this.complete();
-    this.raf = this.host.frame(this.loop);
+    if (!this.loop && beat > score.total + 0.6) return this.complete();
+    this.raf = this.host.frame(this.loop_);
   };
 
   private complete(): void {
@@ -358,6 +498,13 @@ export class Lesson {
   progress(): number {
     if (this.mode === "learn") return this.groups.length ? Math.min(1, this.gi / this.groups.length) : 0;
     return Math.min(1, Math.max(0, this.lastBeat / this.score.total));
+  }
+
+  /** Bucle: repeticiones completas con la mejor y la última; null en Escuchar o si no hay. */
+  loopSummary(): LoopSummary | null {
+    if (!this.loop || this.mode === "listen" || !this.reps.length) return null;
+    const best = this.reps.reduce((a, b) => ((b.score ?? 0) > (a.score ?? 0) ? b : a));
+    return { reps: this.reps.length, best, last: this.reps[this.reps.length - 1] };
   }
 
   result(): LessonResult {
@@ -386,6 +533,14 @@ export class Lesson {
 }
 
 export const starsFor = (pct: number): number => (pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0);
+
+/** Ordena el fragmento y lo recorta a los compases de la pieza. */
+function normalizeLoop(loop: LoopRange, measures: number): LoopRange {
+  const clamp = (i: number) => Math.min(Math.max(Math.round(i), 0), measures - 1);
+  const a = clamp(loop.from);
+  const b = clamp(loop.to);
+  return { from: Math.min(a, b), to: Math.max(a, b) };
+}
 
 /** Agrupa las notas que empiezan a la vez (acordes o las dos manos). */
 export function groupByTime(notes: ScoreNote[]): ScoreNote[][] {

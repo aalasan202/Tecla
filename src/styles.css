@@ -225,6 +225,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .rowh-r { fill: var(--accent); }
 .rowh-l { fill: var(--left); }
 .playhead { stroke: var(--accent); stroke-width: 2; }
+.staff.pickable { cursor: pointer; }
+.loop-range { fill: var(--warm-soft); stroke: var(--warm); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .n { color: var(--ink); transition: color 0.15s; }
 .n.auto { color: var(--faint); }
 .n.now { color: var(--accent); }
@@ -245,6 +247,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .statusbar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .statusbar strong { color: var(--ink); font-weight: 600; }
 .controls { display: flex; gap: 12px 20px; align-items: center; flex-wrap: wrap; }
+.loop-ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.loop-range-label { font-size: 15px; font-weight: 600; color: var(--warm-ink); font-variant-numeric: tabular-nums; min-width: 9ch; }
+.loop-edge { display: inline-flex; align-items: center; gap: 2px; background: var(--line); padding: 3px; border-radius: 10px; font-size: 13px; color: var(--muted); }
+.loop-edge span { padding: 0 6px; }
+.loop-edge button { border: 0; background: var(--surface); color: var(--ink); font: 600 16px/1 var(--body); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; }
+.loop-edge button:disabled { opacity: 0.4; cursor: default; }
 .result { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; background: var(--accent-soft); border-radius: 14px; padding: 14px 18px; }
 .result .big { font: 700 40px/1 var(--display); font-variant-numeric: tabular-nums; }
 .result .rs { color: var(--accent); font-size: 22px; letter-spacing: 3px; }

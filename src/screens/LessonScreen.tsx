@@ -4,6 +4,7 @@ import { buildScore, measureCount } from "../music/score";
 import { noteName } from "../music/theory";
 import type { ScoreNote } from "../music/types";
 import { Lesson, type HandChoice, type LessonResult, type Mode, type NoteMark } from "../engine/lesson";
+import { canNudge, emptySelection, nudge, rangeOf, tapMeasure, toggleLoop, type FragmentEdge, type FragmentSelection } from "../engine/fragment";
 import { ensureAudio, playClick, playTone } from "../audio/synth";
 import { useMidiInput } from "../midi/MidiProvider";
 import { settings } from "../state/settings";
@@ -30,6 +31,7 @@ const LEARN_AT_TEMPO_HINTS: [string, string] = [
   "La partitura avanza a tempo y se detiene en la nota hasta que la toques.",
   "La partitura avanza a tempo y se detiene en la nota hasta que la toques. Si eliges una sola mano, la otra suena y espera contigo.",
 ];
+const LOOP_PLAY_HINT = " Entre repeticiones hay un compás de descanso para volver a colocar la mano.";
 const MODES: [Mode, string][] = [["listen", "Escuchar"], ["learn", "Aprender"], ["play", "Tocar"]];
 
 export function LessonScreen({ songId }: { songId: string }) {
@@ -60,7 +62,13 @@ function LessonView({ songId }: { songId: string }) {
   const [guide, setGuide] = useState<ScoreNote[]>([]);
   const [status, setStatus] = useState<[string, string]>(["Pulsa Empezar", ""]);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<LessonResult | null>(null);
+  const [result, setResult] = useState<(LessonResult & { loop?: boolean }) | null>(null);
+  // fragmento en bucle: vive mientras dura la lección (se pierde al salir o cambiar de pieza)
+  const [sel, setSel] = useState<FragmentSelection>(emptySelection);
+  const loopRange = useMemo(() => rangeOf(sel), [sel]);
+  const loopFrom = loopRange?.from;
+  const loopTo = loopRange?.to;
+  const measures = measureCount(score);
 
   const range = useMemo(() => {
     const ms = score.notes.map((n) => n.m);
@@ -81,13 +89,20 @@ function LessonView({ songId }: { songId: string }) {
         addPractice((performance.now() - startedAt.current) / 1000);
         startedAt.current = null;
       }
-      recordSession({ songId, mode: l.mode, hands: l.hands, progress: l.progress() });
+      // el bucle es práctica parcial: suma tiempo, pero no cuenta como intento de la pieza
+      if (!l.loop) recordSession({ songId, mode: l.mode, hands: l.hands, progress: l.progress() });
     },
     [songId],
   );
 
+  // aparte de la lección, para que cambiar el fragmento o «A tempo» no reescriba la última sesión
   useEffect(() => {
     recordSession({ songId, mode, hands, progress: resume && resume.mode === mode && resume.hands === hands ? resume.progress : 0 });
+    // resume solo se lee al entrar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songId, mode, hands]);
+
+  useEffect(() => {
     setResult(null);
     setRunning(false);
     setStatus(["Pulsa Empezar", ""]);
@@ -111,7 +126,7 @@ function LessonView({ songId }: { songId: string }) {
         saveAttempt(l);
         if (r.mode === "play" && (!score.twoHands || hands === "both")) recordStars(songId, r.stars);
       },
-    }, { atTempo: prefs.learnAtTempo });
+    }, { atTempo: prefs.learnAtTempo, loop: loopFrom === undefined || loopTo === undefined ? undefined : { from: loopFrom, to: loopTo } });
     lesson.current = l;
     staff.current?.scrollTo(0, false);
     return () => {
@@ -122,7 +137,7 @@ function LessonView({ songId }: { songId: string }) {
     };
     // el tempo no reinicia la lección; resume solo se lee al entrar
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [score, mode, hands, prefs.learnAtTempo]);
+  }, [score, mode, hands, prefs.learnAtTempo, loopFrom, loopTo]);
 
   useEffect(() => {
     if (lesson.current) lesson.current.tempo = tempo;
@@ -138,16 +153,33 @@ function LessonView({ songId }: { songId: string }) {
     if (l.running) {
       l.stop();
       saveAttempt(l);
+      const summary = l.loopSummary();
       l.reset();
       setRunning(false);
-      setStatus(["Pulsa Empezar", ""]);
+      setStatus([l.loop ? "Bucle detenido" : "Pulsa Empezar", ""]);
+      if (summary) {
+        const pct = (r: LessonResult) => `${Math.round((r.score ?? 0) * 100)} %`;
+        const reps = `${summary.reps} ${summary.reps === 1 ? "repetición" : "repeticiones"}`;
+        setResult({ ...summary.best, loop: true, message: `${reps} · mejor ${pct(summary.best)} · última ${pct(summary.last)}` });
+      }
       return;
     }
     setResult(null);
     startedAt.current = performance.now();
     l.start();
-    setRunning(true);
+    // un fragmento sin notas de la mano elegida no arranca (el motor ya lo explica en el estado)
+    if (!l.running) startedAt.current = null;
+    setRunning(l.running);
   };
+
+  const pickHint =
+    sel.a === null ? "Pulsa en la partitura el compás donde empieza el fragmento" : "Pulsa en la partitura el compás donde acaba el fragmento";
+  const shownStatus: [string, string] = !running && sel.on && !loopRange ? [pickHint, ""] : status;
+  const edge = (e: FragmentEdge, d: 1 | -1, label: string, text: string) => (
+    <button aria-label={label} disabled={!canNudge(sel, e, d, measures)} onClick={() => setSel((s) => nudge(s, e, d, measures))}>
+      {text}
+    </button>
+  );
 
   const autoIds = useMemo(
     () => new Set(score.notes.filter((n) => score.twoHands && hands !== "both" && n.h !== hands).map((n) => n.id)),
@@ -188,7 +220,10 @@ function LessonView({ songId }: { songId: string }) {
           </button>
         ))}
       </div>
-      <p className="hint">{(mode === "learn" && prefs.learnAtTempo ? LEARN_AT_TEMPO_HINTS : HINTS[mode])[score.twoHands ? 1 : 0]}</p>
+      <p className="hint">
+        {(mode === "learn" && prefs.learnAtTempo ? LEARN_AT_TEMPO_HINTS : HINTS[mode])[score.twoHands ? 1 : 0]}
+        {mode === "play" && loopRange && LOOP_PLAY_HINT}
+      </p>
 
       <div className="board">
         <Staff
@@ -199,10 +234,18 @@ function LessonView({ songId }: { songId: string }) {
           showNames={prefs.showNames}
           showFingers={prefs.showFingers}
           notation={prefs.notation}
+          loop={
+            sel.on && sel.a !== null
+              ? sel.b === null
+                ? { from: sel.a, to: null }
+                : { from: Math.min(sel.a, sel.b), to: Math.max(sel.a, sel.b) }
+              : null
+          }
+          onMeasure={sel.on ? (i) => setSel((s) => tapMeasure(s, i)) : undefined}
         />
         <div className="statusbar" aria-live="polite">
-          <span>{status[0]}</span>
-          <strong>{status[1]}</strong>
+          <span>{shownStatus[0]}</span>
+          <strong>{shownStatus[1]}</strong>
         </div>
       </div>
 
@@ -215,6 +258,28 @@ function LessonView({ songId }: { songId: string }) {
             <input type="checkbox" checked={prefs.learnAtTempo} onChange={(e) => settings.set({ learnAtTempo: e.target.checked })} /> A tempo
           </label>
         )}
+        <div className="loop-ctl">
+          <label className="field">
+            <input type="checkbox" checked={sel.on} onChange={(e) => setSel((s) => toggleLoop(s, e.target.checked))} /> Bucle
+          </label>
+          {loopRange && (
+            <>
+              <span className="loop-range-label">
+                Compases {loopRange.from + 1}–{loopRange.to + 1}
+              </span>
+              <span className="loop-edge">
+                {edge("from", -1, "Inicio un compás antes", "−")}
+                <span>inicio</span>
+                {edge("from", 1, "Inicio un compás después", "+")}
+              </span>
+              <span className="loop-edge">
+                {edge("to", -1, "Fin un compás antes", "−")}
+                <span>fin</span>
+                {edge("to", 1, "Fin un compás después", "+")}
+              </span>
+            </>
+          )}
+        </div>
         <label className="field" style={{ visibility: mode === "learn" && !prefs.learnAtTempo ? "hidden" : "visible" }}>
           Tempo
           <input type="range" min={40} max={140} step={5} value={tempo} onChange={(e) => setTempo(Number(e.target.value))} />
@@ -242,7 +307,7 @@ function LessonView({ songId }: { songId: string }) {
             <button className="btn" onClick={toggleRun}>
               Repetir
             </button>
-            {mode !== "play" && (
+            {mode !== "play" && !result.loop && (
               <button className="btn primary" onClick={() => setMode(mode === "listen" ? "learn" : "play")}>
                 Siguiente paso
               </button>

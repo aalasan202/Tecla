@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Lesson, groupByTime, starsFor, type LessonHost, type LessonResult } from "./lesson";
+import { COUNT_IN, Lesson, groupByTime, starsFor, type LessonHost, type LessonResult } from "./lesson";
 import { STAFF_LEFT, buildScore } from "../music/score";
 import { SONGS } from "../music/songs";
+import type { SongDef } from "../music/types";
 
 function fakeHost(clock = { t: 0 }) {
   const finished: LessonResult[] = [];
@@ -224,6 +225,213 @@ describe("Aprender a tempo", () => {
     l.input(48);
     tick(500);
     expect(beatOf(xs, score.px)).toBeCloseTo(0.5);
+    l.stop();
+  });
+});
+
+describe("Bucle — límites", () => {
+  it("ordena y recorta el fragmento", () => {
+    const { host } = fakeHost();
+    const score = song("cinco");
+    const measures = score.total / score.bar;
+    expect(new Lesson(score, "learn", "both", 80, host, { loop: { from: 3, to: 1 } }).loop).toEqual({ from: 1, to: 3 });
+    expect(new Lesson(score, "play", "both", 80, host, { loop: { from: -2, to: 99 } }).loop).toEqual({ from: 0, to: measures - 1 });
+    expect(new Lesson(score, "listen", "both", 80, host).loop).toBeNull();
+  });
+});
+
+/** Notas de un fragmento (compases from…to, base 0). */
+const inLoop = (score: ReturnType<typeof song>, from: number, to: number) =>
+  score.notes.filter((n) => n.s >= from * score.bar && n.s < (to + 1) * score.bar);
+type Mock = ReturnType<typeof vi.fn>;
+const lastCall = (fn: unknown) => (fn as Mock).mock.calls[(fn as Mock).mock.calls.length - 1];
+const statusTexts = (host: LessonHost) => (host.status as Mock).mock.calls.map((c) => c[0] as string);
+const EMPTY = ["No hay notas de esta mano en el fragmento", "Elige otros compases u otra mano"] as const;
+/** Avanza fotogramas de 50 ms hasta el instante t (ms), cayendo exactamente en él. */
+const runTo = (host: LessonHost, tick: (ms: number) => void, t: number) => {
+  while (host.now() + 50 < t) tick(50);
+  if (host.now() < t) tick(t - host.now());
+};
+
+describe("Bucle — Aprender", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("solo pide notas del fragmento y, tras la última, vuelve a la primera", () => {
+    const { host, finished } = fakeHost();
+    const score = song("cinco");
+    const frag = inLoop(score, 2, 2);
+    const l = new Lesson(score, "learn", "both", 80, host, { loop: { from: 2, to: 2 } });
+    l.start();
+    expect(l.running).toBe(true);
+    expect(lastCall(host.guide)[0]).toEqual([frag[0]]);
+    for (const n of frag) l.input(n.m);
+    vi.runAllTimers();
+    expect(lastCall(host.guide)[0]).toEqual([frag[0]]);
+    for (const n of frag) expect(host.mark).toHaveBeenCalledWith(n.id, null);
+    const guided = (host.guide as Mock).mock.calls.flatMap((c) => c[0] as { s: number }[]);
+    expect(guided.every((n) => n.s >= 8 && n.s < 12)).toBe(true);
+    expect(finished).toHaveLength(0);
+    l.stop();
+  });
+
+  it("una tecla que no es la esperada cuenta como fallo", () => {
+    const { host } = fakeHost();
+    const score = song("cinco");
+    const l = new Lesson(score, "learn", "both", 80, host, { loop: { from: 2, to: 2 } });
+    l.start();
+    l.input(67); // nota del compás 2, fuera del fragmento
+    expect(host.flash).toHaveBeenCalledWith(67, "wrong", 350);
+    expect(l.result().score).toBeCloseTo(4 / 5);
+    l.stop();
+  });
+
+  it("un fragmento sin notas de la mano elegida no arranca", () => {
+    const { host } = fakeHost();
+    const l = new Lesson(song("pregunta"), "learn", "L", 80, host, { loop: { from: 0, to: 1 } });
+    l.start();
+    expect(l.running).toBe(false);
+    expect(host.status).toHaveBeenLastCalledWith(...EMPTY);
+  });
+
+  it("«A tempo»: al pasar el final del fragmento el cursor vuelve al inicio", () => {
+    const { host, tick, xs } = tempoHost();
+    const score = song("cinco");
+    const frag = inLoop(score, 2, 2);
+    const l = new Lesson(score, "learn", "both", 60, host, { atTempo: true, loop: { from: 2, to: 2 } });
+    l.start();
+    tick(16);
+    expect(beatOf(xs, score.px)).toBeCloseTo(8, 1);
+    for (const n of frag) l.input(n.m);
+    let wrapped = false;
+    let prev = 8;
+    for (let k = 0; k < 50 && !wrapped; k++) {
+      tick(100);
+      const b = beatOf(xs, score.px);
+      if (b < prev) wrapped = true;
+      prev = b;
+    }
+    expect(wrapped).toBe(true);
+    expect(prev).toBeLessThan(8.2);
+    expect(lastCall(host.guide)[0]).toEqual([frag[0]]);
+    l.stop();
+  });
+});
+
+describe("Bucle — Escuchar y Tocar", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("Escuchar: solo suena el fragmento, una vez por vuelta", () => {
+    const { host, tick } = tempoHost();
+    const score = song("cinco");
+    const frag = inLoop(score, 2, 2);
+    const l = new Lesson(score, "listen", "both", 60, host, { loop: { from: 2, to: 2 } });
+    l.start();
+    runTo(host, tick, 300 + 3 * 4000 - 50);
+    const tones = (host.tone as Mock).mock.calls.map((c) => c[0] as number);
+    const once = frag.map((n) => n.m);
+    expect(tones).toEqual([...once, ...once, ...once]);
+    l.stop();
+  });
+
+  it("Tocar: cuenta atrás una vez, compás de descanso con clics y sin finish", () => {
+    const { host, finished, tick } = tempoHost();
+    const score = song("cinco");
+    const l = new Lesson(score, "play", "both", 60, host, { loop: { from: 2, to: 2 } }); // L 4, P 8
+    l.start();
+    runTo(host, tick, (COUNT_IN + 2 * 8) * 1000 + 100);
+    const clicks = (host.click as Mock).mock.calls.map((c) => c[0] as boolean);
+    expect(clicks).toHaveLength(COUNT_IN + 2 * 8 + 1);
+    clicks.forEach((strong, i) => expect(strong).toBe(i % 4 === 0));
+    expect(statusTexts(host)).toContain("Otra vez… 3");
+    expect(finished).toHaveLength(0);
+    l.stop();
+  });
+
+  it("Tocar: la 2.ª repetición se puntúa en su pulso, también por adelantado", () => {
+    for (const at of [COUNT_IN + 8, COUNT_IN + 8 - 0.3]) {
+      const { host, tick } = tempoHost();
+      const score = song("cinco");
+      const frag = inLoop(score, 2, 2);
+      const l = new Lesson(score, "play", "both", 60, host, { loop: { from: 2, to: 2 } });
+      l.start();
+      runTo(host, tick, at * 1000);
+      (host.mark as Mock).mockClear();
+      l.input(frag[0].m);
+      expect(host.mark).toHaveBeenCalledWith(frag[0].id, "hit");
+      l.stop();
+    }
+  });
+
+  it("Tocar: un fragmento sin notas de la mano elegida no arranca", () => {
+    const { host } = fakeHost();
+    const l = new Lesson(song("pregunta"), "play", "L", 80, host, { loop: { from: 0, to: 1 } });
+    l.start();
+    expect(l.running).toBe(false);
+    expect(host.status).toHaveBeenLastCalledWith(...EMPTY);
+    expect(host.click).not.toHaveBeenCalled();
+  });
+
+  it("una mano: el acompañamiento se limita al fragmento y se repite", () => {
+    const { host, tick } = tempoHost();
+    const score = song("oda2");
+    const autos = inLoop(score, 1, 1).filter((n) => n.h === "L");
+    expect(autos.length).toBeGreaterThan(0);
+    const l = new Lesson(score, "play", "R", 60, host, { loop: { from: 1, to: 1 } });
+    l.start();
+    runTo(host, tick, (COUNT_IN + 2 * 8) * 1000 - 100);
+    const tones = (host.tone as Mock).mock.calls.map((c) => c[0] as number);
+    expect(tones).toEqual([...autos, ...autos].map((n) => n.m));
+    l.stop();
+  });
+
+  it("el sonido de una nota que cruza el final del fragmento se recorta", () => {
+    const def: SongDef = { id: "x", title: "x", level: "x", tempo: 60, n: [[60, 6], [62, 2]] };
+    const score = buildScore(def);
+    const { host, tick } = tempoHost();
+    const l = new Lesson(score, "listen", "both", 60, host, { loop: { from: 0, to: 0 } });
+    l.start();
+    tick(400);
+    expect(host.tone).toHaveBeenCalledTimes(1);
+    expect(lastCall(host.tone)[1]).toBeLessThanOrEqual(4 * 0.95 + 1e-9);
+    l.stop();
+  });
+});
+
+describe("Bucle — repeticiones", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("Aprender: estado con repetición y resultado anterior, y resumen", () => {
+    const { host } = fakeHost();
+    const score = song("cinco");
+    const frag = inLoop(score, 2, 2);
+    const l = new Lesson(score, "learn", "both", 80, host, { loop: { from: 2, to: 2 } });
+    l.start();
+    expect(l.loopSummary()).toBeNull();
+    expect(lastCall(host.status)[0]).toMatch(/^Repetición 1 · /);
+    l.input(61); // un fallo en la 1.ª
+    for (let rep = 0; rep < 3; rep++) {
+      for (const n of frag) l.input(n.m);
+      vi.runAllTimers();
+    }
+    expect(statusTexts(host).some((t) => t.startsWith("Repetición 2 · anterior 80 %"))).toBe(true);
+    expect(lastCall(host.status)[0]).toMatch(/^Repetición 4 · anterior 100 %/);
+    const sum = l.loopSummary()!;
+    expect(sum.reps).toBe(3);
+    expect(sum.best.score).toBe(1);
+    expect(sum.last.score).toBe(1);
+    l.stop();
+  });
+
+  it("Escuchar: solo el número de repetición y sin resumen", () => {
+    const { host, tick } = tempoHost();
+    const l = new Lesson(song("cinco"), "listen", "both", 60, host, { loop: { from: 2, to: 2 } });
+    l.start();
+    runTo(host, tick, 300 + 4000 + 500);
+    expect(lastCall(host.status)[0]).toBe("Repetición 2 · Compás 3 de 4");
+    expect(l.loopSummary()).toBeNull();
     l.stop();
   });
 });

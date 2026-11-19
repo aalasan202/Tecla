@@ -2,7 +2,7 @@ import { forwardRef, memo, useImperativeHandle, useMemo, useRef } from "react";
 import type { Score, ScoreNote } from "../music/types";
 import type { NoteMark } from "../engine/lesson";
 import { isWhite, noteName, staffStep, type Notation } from "../music/theory";
-import { STAFF_LEFT } from "../music/score";
+import { STAFF_LEFT, measureAt } from "../music/score";
 
 /** Medio espacio entre líneas, en px. */
 const H = 6;
@@ -28,9 +28,13 @@ interface Props {
   showNames: boolean;
   showFingers: boolean;
   notation?: Notation;
+  /** Fragmento en bucle que se resalta (compases base 0; `to` null si falta el segundo extremo). */
+  loop?: { from: number; to: number | null } | null;
+  /** Si existe, tocar la partitura elige un compás. */
+  onMeasure?: (i: number) => void;
 }
 
-export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, marks, autoIds, showNames, showFingers, notation = "latin" }, ref) {
+export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, marks, autoIds, showNames, showFingers, notation = "latin", loop = null, onMeasure }, ref) {
   const wrap = useRef<HTMLDivElement>(null);
   const head = useRef<SVGLineElement>(null);
 
@@ -80,7 +84,27 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
 
   return (
     <div className="staff-wrap" ref={wrap}>
-      <svg className="staff" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Partitura de ${score.song.title}`}>
+      <svg
+        className={onMeasure ? "staff pickable" : "staff"}
+        onClick={
+          onMeasure &&
+          ((e) => {
+            // el rectángulo del <svg> ya se mueve con el scroll del contenedor
+            const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
+            onMeasure(measureAt(score, x));
+          })
+        }
+        width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Partitura de ${score.song.title}`}>
+        {loop && (
+          <rect
+            className="loop-range"
+            x={STAFF_LEFT + loop.from * bar * px + 2}
+            width={((loop.to ?? loop.from) - loop.from + 1) * bar * px}
+            y={top - 18}
+            height={bottom + 30 - (top - 18)}
+            rx={6}
+          />
+        )}
         <Lines y={TREBLE_BOTTOM} width={width} />
         <text x={12} y={TREBLE_BOTTOM - 2 * H} fontSize={8 * H} className="glyph">{"\u{1D11E}"}</text>
         <TimeSig y={TREBLE_BOTTOM} top={bar} />

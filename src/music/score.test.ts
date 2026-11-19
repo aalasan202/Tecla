@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SONGS } from "./songs";
-import { buildScore } from "./score";
+import { STAFF_LEFT, buildScore, measureAt } from "./score";
 import { staffStep } from "./theory";
 import type { SongDef } from "./types";
 
@@ -88,5 +88,26 @@ describe("digitación", () => {
     const left = score.notes.filter((n) => n.h === "L");
     const top = left.reduce((a, b) => (b.m > a.m ? b : a));
     expect(top.f).toBe(1);
+  });
+});
+
+describe("measureAt", () => {
+  it("convierte una x de la partitura en compás (4/4)", () => {
+    const score = buildScore(byId("cinco")); // px 50
+    expect(measureAt(score, STAFF_LEFT + 2)).toBe(0);
+    expect(measureAt(score, STAFF_LEFT + 4 * 50 + 1)).toBe(0);
+    expect(measureAt(score, STAFF_LEFT + 4 * 50 + 3)).toBe(1);
+  });
+
+  it("usa la duración del compás (3/4)", () => {
+    const score = buildScore(byId("minueto")); // px 64
+    expect(measureAt(score, STAFF_LEFT + 3 * 64 + 1)).toBe(0);
+    expect(measureAt(score, STAFF_LEFT + 3 * 64 + 3)).toBe(1);
+  });
+
+  it("recorta a los extremos de la pieza", () => {
+    const score = buildScore(byId("cinco"));
+    expect(measureAt(score, -50)).toBe(0);
+    expect(measureAt(score, 1e6)).toBe(score.total / score.bar - 1);
   });
 });

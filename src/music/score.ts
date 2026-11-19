@@ -48,3 +48,9 @@ export function buildScore(song: SongDef): Score {
 }
 
 export const measureCount = (score: Score): number => score.total / score.bar;
+
+/** Compás (base 0) bajo la coordenada x de la partitura, recortado a la pieza. */
+export function measureAt(score: Score, x: number): number {
+  const i = Math.floor((x - STAFF_LEFT - 2) / (score.bar * score.px));
+  return Math.min(Math.max(i, 0), measureCount(score) - 1);
+}
