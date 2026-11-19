@@ -259,6 +259,77 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .result p { margin: 0; flex: 1 1 200px; }
 .result .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Lección en móvil apaisado: rejilla de altura fija, sin desplazamiento de página.
+   La clase .compact solo la pone la pantalla cuando se cumple esta misma media query. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body:has(.lesson.compact) {
+    --pad-t: max(6px, env(safe-area-inset-top)); --pad-b: max(6px, env(safe-area-inset-bottom));
+    --pad-l: max(6px, env(safe-area-inset-left)); --pad-r: max(6px, env(safe-area-inset-right));
+    padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l); overflow: hidden;
+  }
+  body:has(.lesson.compact) .app { max-width: none; }
+  .lesson.compact {
+    display: grid; gap: 6px; height: calc(100dvh - var(--pad-t) - var(--pad-b));
+    grid-template-rows: 44px minmax(0, 1fr) clamp(110px, 34dvh, 170px); grid-template-columns: minmax(0, 1fr);
+  }
+  .lesson.compact .board { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+  .lesson.compact .staff-wrap { height: 100%; min-height: 0; overflow-x: auto; overflow-y: hidden; display: flex; align-items: center; }
+  .lesson.compact .staff { flex: none; }
+  .lesson.compact .statusbar { flex-wrap: nowrap; padding: 2px 12px; min-height: 24px; font-size: 13px; align-items: center; }
+  .lesson.compact .statusbar > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .lesson.compact .statusbar > span { flex: 1 1 auto; }
+  .lesson.compact .statusbar > strong { flex: 0 1 auto; }
+  .lesson.compact .kb-wrap.fit { height: 100%; padding-bottom: 0; }
+  .lesson.compact .kb-wrap.fit .kb { height: 100%; }
+
+  /* fila de práctica */
+  .practice-row { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; min-width: 0; }
+  .practice-row .icon-btn { width: 40px; height: 40px; border-radius: 10px; }
+  .practice-row .modes { display: flex; flex: 0 1 auto; min-width: 0; padding: 3px; gap: 2px; }
+  .practice-row .mode { min-height: 38px; min-width: 40px; padding: 4px 8px; font-size: 14px; flex: none; }
+  .practice-row .mode[aria-selected="true"] { flex: 0 1 auto; min-width: 0; }
+  .practice-row .mode .mode-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .practice-row .mode[aria-selected="false"] .mode-name { display: none; }
+  .practice-row .seg { flex: none; flex-wrap: nowrap; align-self: center; }
+  .practice-row .seg button { min-width: 40px; min-height: 38px; padding: 0 8px; justify-content: center; gap: 3px; }
+  .practice-row .btn { min-height: 40px; padding: 6px 14px; flex: none; }
+  .practice-row .row-spacer { flex: 1 1 0; min-width: 0; }
+  .loop-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; min-width: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 600; font-size: 14px; cursor: pointer; flex: none; }
+  .loop-toggle[aria-pressed="true"] { color: var(--warm-ink); border-color: var(--warm); background: var(--warm-soft); }
+  .loop-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--warm); background: var(--surface); color: var(--warm-ink); font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; cursor: pointer; flex: none; }
+
+  /* paneles superpuestos */
+  .popover-backdrop { position: fixed; inset: 0; z-index: 20; }
+  .popover {
+    position: fixed; z-index: 21; top: calc(var(--pad-t) + 50px); width: min(360px, calc(100vw - var(--pad-l) - var(--pad-r)));
+    max-height: calc(100dvh - var(--pad-t) - var(--pad-b) - 56px); overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; padding-right: 52px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 32px rgba(10, 16, 40, 0.22);
+  }
+  .popover.end { right: var(--pad-r); }
+  .popover.start { left: var(--pad-l); }
+  .popover-close { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; }
+  .popover h2 { font-size: 18px; }
+  .popover .hint { font-size: 14px; }
+  .popover .field { min-height: 40px; }
+  .popover .field input[type="range"] { flex: 1; min-width: 0; }
+  .popover .loop-edge { justify-content: space-between; font-size: 14px; }
+  .popover .loop-edge button { width: 40px; height: 40px; }
+  .popover .connection { display: flex; flex-direction: column; gap: 8px; }
+  .popover .connection-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .popover .chip { max-width: 100%; }
+
+  /* resultado superpuesto */
+  .lesson.compact .result {
+    position: fixed; z-index: 22; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100vw - 24px)); padding: 16px 56px 16px 20px; background: var(--surface);
+    border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(10, 16, 40, 0.25);
+  }
+  .lesson.compact .result .big { font-size: 32px; }
+  .lesson.compact .result .btn { min-height: 40px; }
+  .result-close { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; }
+}
+
 /* ---------- teclado ---------- */
 .kb-wrap { overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
 .kb { position: relative; height: 170px; display: flex; user-select: none; -webkit-user-select: none; touch-action: none; }

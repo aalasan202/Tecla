@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "rea
 import type { ScoreNote } from "../music/types";
 import type { KeyFlash } from "../engine/lesson";
 import { isWhite, noteName, octaveOf, type Notation } from "../music/theory";
+import { keyScroll } from "../ui/layout";
 
 export interface KeyboardHandle {
   flash(m: number, kind: KeyFlash, ms?: number): void;
@@ -17,11 +18,17 @@ interface Props {
   height?: number;
   /** Mostrar las letras del teclado del ordenador. */
   letters?: boolean;
+  /** Ajustar al contenedor (móvil apaisado): alto del contenedor, teclas de 28 px como mínimo,
+   * sin letras y desplazamiento automático hasta las teclas guiadas. */
+  fit?: boolean;
 }
 
 const WHITE_LETTERS = "asdfghjklñ";
 const BLACK_LETTERS = "wertyuiop";
 const MIN_WHITES = 10;
+/** Ancho mínimo de una tecla blanca, en px. */
+const KEY_W = 34;
+const KEY_W_FIT = 28;
 
 /** Teclas blancas del rango, con margen y un mínimo de diez. */
 export function keyboardRange(low: number, high: number): number[] {
@@ -39,8 +46,10 @@ export function keyboardRange(low: number, high: number): number[] {
   return whites;
 }
 
-export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ low, high, guide, onPress, notation = "latin", height = 170, letters = true }, ref) {
+export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ low, high, guide, onPress, notation = "latin", height = 170, letters: showLetters = true, fit = false }, ref) {
   const whites = useMemo(() => keyboardRange(low, high), [low, high]);
+  const letters = showLetters && !fit;
+  const wrap = useRef<HTMLDivElement>(null);
   const keyEls = useRef(new Map<number, HTMLDivElement>());
   const press = useRef(onPress);
   press.current = onPress;
@@ -91,11 +100,20 @@ export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ lo
   };
   const share = 100 / whites.length;
 
+  // con fit, si el teclado no cabe entero, sigue a las teclas guiadas (la página no se mueve)
+  useEffect(() => {
+    const w = wrap.current;
+    if (!fit || !w || w.scrollWidth <= w.clientWidth) return;
+    const targets = guide.map((n) => whites.indexOf(isWhite(n.m) ? n.m : n.m - 1)).filter((i) => i >= 0);
+    const left = keyScroll({ targets, whites: whites.length, keyW: w.scrollWidth / whites.length, view: w.clientWidth, left: w.scrollLeft });
+    if (left !== w.scrollLeft) w.scrollTo({ left, behavior: "smooth" });
+  }, [fit, guide, whites]);
+
   return (
-    <div className="kb-wrap">
+    <div className={fit ? "kb-wrap fit" : "kb-wrap"} ref={wrap}>
       <div
         className="kb"
-        style={{ minWidth: whites.length * 34, height }}
+        style={{ minWidth: whites.length * (fit ? KEY_W_FIT : KEY_W), height: fit ? "100%" : height }}
         onPointerDown={(e) => {
           const key = (e.target as HTMLElement).closest<HTMLElement>(".key");
           if (!key) return;

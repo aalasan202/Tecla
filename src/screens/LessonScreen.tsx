@@ -11,7 +11,11 @@ import { settings } from "../state/settings";
 import { addPractice, progress, recordSession, recordStars } from "../state/progress";
 import { Staff, type StaffHandle } from "../components/Staff";
 import { Keyboard, type KeyboardHandle } from "../components/Keyboard";
-import { TopBar } from "../components/TopBar";
+import { ConnectionStatus, TopBar } from "../components/TopBar";
+import { Popover } from "../components/Popover";
+import { IconBack, IconSettings } from "../components/Icons";
+import { goBack } from "../router";
+import { useCompactLesson } from "../ui/useCompactLesson";
 
 const HINTS: Record<Mode, [string, string]> = {
   listen: [
@@ -69,6 +73,12 @@ function LessonView({ songId }: { songId: string }) {
   const loopFrom = loopRange?.from;
   const loopTo = loopRange?.to;
   const measures = measureCount(score);
+  // móvil apaisado: disposición compacta con paneles; no recrea la lección al cambiar
+  const compact = useCompactLesson();
+  const [panel, setPanel] = useState<"options" | "loop" | null>(null);
+  useEffect(() => {
+    if (!compact || (panel === "loop" && !loopRange)) setPanel(null);
+  }, [compact, panel, loopRange]);
 
   const range = useMemo(() => {
     const ms = score.notes.map((n) => n.m);
@@ -186,6 +196,189 @@ function LessonView({ songId }: { songId: string }) {
     [score, hands],
   );
 
+  const closePanel = useCallback(() => setPanel(null), []);
+  const hint = (
+    <>
+      {(mode === "learn" && prefs.learnAtTempo ? LEARN_AT_TEMPO_HINTS : HINTS[mode])[score.twoHands ? 1 : 0]}
+      {mode === "play" && loopRange && LOOP_PLAY_HINT}
+    </>
+  );
+  const loopEdges = (
+    <>
+      <span className="loop-edge">
+        {edge("from", -1, "Inicio un compás antes", "−")}
+        <span>inicio</span>
+        {edge("from", 1, "Inicio un compás después", "+")}
+      </span>
+      <span className="loop-edge">
+        {edge("to", -1, "Fin un compás antes", "−")}
+        <span>fin</span>
+        {edge("to", 1, "Fin un compás después", "+")}
+      </span>
+    </>
+  );
+  const atTempoField = mode === "learn" && (
+    <label className="field">
+      <input type="checkbox" checked={prefs.learnAtTempo} onChange={(e) => settings.set({ learnAtTempo: e.target.checked })} /> A tempo
+    </label>
+  );
+  const tempoField = (
+    <label className="field" style={{ visibility: mode === "learn" && !prefs.learnAtTempo ? "hidden" : "visible" }}>
+      Tempo
+      <input type="range" min={40} max={140} step={5} value={tempo} onChange={(e) => setTempo(Number(e.target.value))} />
+      <output>{tempo}</output> ppm
+    </label>
+  );
+  const viewFields = (
+    <>
+      <label className="field">
+        <input type="checkbox" checked={prefs.showNames} onChange={(e) => settings.set({ showNames: e.target.checked })} /> Nombres de las notas
+      </label>
+      <label className="field">
+        <input type="checkbox" checked={prefs.showFingers} onChange={(e) => settings.set({ showFingers: e.target.checked })} /> Números de dedo
+      </label>
+    </>
+  );
+  const board = (
+    <div className="board">
+      <Staff
+        ref={staff}
+        score={score}
+        marks={marks}
+        autoIds={autoIds}
+        showNames={prefs.showNames}
+        showFingers={prefs.showFingers}
+        notation={prefs.notation}
+        loop={
+          sel.on && sel.a !== null
+            ? sel.b === null
+              ? { from: sel.a, to: null }
+              : { from: Math.min(sel.a, sel.b), to: Math.max(sel.a, sel.b) }
+            : null
+        }
+        onMeasure={sel.on ? (i) => setSel((s) => tapMeasure(s, i)) : undefined}
+        fit={compact}
+      />
+      <div className="statusbar" aria-live="polite">
+        <span>{shownStatus[0]}</span>
+        <strong>{shownStatus[1]}</strong>
+      </div>
+    </div>
+  );
+  const resultCard = result && (
+    <div className="result">
+      {compact && (
+        <button type="button" className="result-close" aria-label="Cerrar" onClick={() => setResult(null)}>
+          ×
+        </button>
+      )}
+      <div className="big">{result.score === null ? "♪" : `${Math.round(result.score * 100)}%`}</div>
+      {result.score !== null && (
+        <div className="rs" aria-label={`${result.stars} de 3 estrellas`}>
+          {"★".repeat(result.stars)}
+          {"☆".repeat(3 - result.stars)}
+        </div>
+      )}
+      <p>{result.message}</p>
+      <div className="acts">
+        <button className="btn" onClick={toggleRun}>
+          Repetir
+        </button>
+        {mode !== "play" && !result.loop && (
+          <button className="btn primary" onClick={() => setMode(mode === "listen" ? "learn" : "play")}>
+            Siguiente paso
+          </button>
+        )}
+      </div>
+    </div>
+  );
+  const keyboard = <Keyboard ref={keys} low={range[0]} high={range[1]} guide={guide} onPress={press} notation={prefs.notation} fit={compact} />;
+
+  if (compact) {
+    return (
+      <div className="screen lesson compact">
+        <div className="practice-row">
+          <button type="button" className="icon-btn" aria-label="Atrás" onClick={() => goBack({ name: "songs" })}>
+            <IconBack />
+          </button>
+          <div className="modes" role="tablist" aria-label="Pasos de la lección">
+            {MODES.map(([m, label], i) => (
+              <button key={m} className="mode" role="tab" aria-selected={mode === m} aria-label={`${i + 1}. ${label}`} onClick={() => setMode(m)}>
+                <i>{i + 1}</i>
+                <span className="mode-name">{label}</span>
+              </button>
+            ))}
+          </div>
+          {score.twoHands && (
+            <div className="seg" role="group" aria-label="Qué mano practicas">
+              {(
+                [
+                  ["both", "Ambas manos"],
+                  ["R", "Mano derecha"],
+                  ["L", "Mano izquierda"],
+                ] as [HandChoice, string][]
+              ).map(([h, label]) => (
+                <button key={h} aria-pressed={hands === h} aria-label={label} title={label} onClick={() => setHands(h)}>
+                  {h !== "L" && <span className="dot r" />}
+                  {h !== "R" && <span className="dot l" />}
+                </button>
+              ))}
+            </div>
+          )}
+          <button className="btn primary" onClick={toggleRun}>
+            {running ? "Parar" : "Empezar"}
+          </button>
+          <button type="button" className="loop-toggle" aria-label="Bucle" aria-pressed={sel.on} onClick={() => setSel((s) => toggleLoop(s, !s.on))}>
+            ⟲{!loopRange && " Bucle"}
+          </button>
+          {loopRange && (
+            <button
+              type="button"
+              className="loop-chip"
+              aria-label={`Compases ${loopRange.from + 1}–${loopRange.to + 1}: ajustar inicio y fin`}
+              aria-expanded={panel === "loop"}
+              onClick={() => setPanel(panel === "loop" ? null : "loop")}
+            >
+              {loopRange.from + 1}–{loopRange.to + 1} ▾
+            </button>
+          )}
+          <span className="row-spacer" />
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Opciones"
+            aria-expanded={panel === "options"}
+            onClick={() => setPanel(panel === "options" ? null : "options")}
+          >
+            <IconSettings size={20} />
+          </button>
+        </div>
+
+        <Popover open={panel === "loop" && loopRange !== null} onClose={closePanel} anchor="end" label="Ajustar fragmento">
+          {loopRange && (
+            <p className="hint">
+              Compases {loopRange.from + 1}–{loopRange.to + 1}
+            </p>
+          )}
+          {loopEdges}
+        </Popover>
+        <Popover open={panel === "options"} onClose={closePanel} anchor="end" label="Opciones de la lección">
+          <h2>{song.title}</h2>
+          <p className="hint">{hint}</p>
+          {atTempoField}
+          {tempoField}
+          {viewFields}
+          <ConnectionStatus />
+          <a href="#ajustes">Ajustes</a>
+        </Popover>
+
+        {board}
+        {resultCard}
+        {keyboard}
+      </div>
+    );
+  }
+
   return (
     <div className="screen lesson">
       <TopBar title={song.title} back={{ name: "songs" }} />
@@ -220,44 +413,15 @@ function LessonView({ songId }: { songId: string }) {
           </button>
         ))}
       </div>
-      <p className="hint">
-        {(mode === "learn" && prefs.learnAtTempo ? LEARN_AT_TEMPO_HINTS : HINTS[mode])[score.twoHands ? 1 : 0]}
-        {mode === "play" && loopRange && LOOP_PLAY_HINT}
-      </p>
+      <p className="hint">{hint}</p>
 
-      <div className="board">
-        <Staff
-          ref={staff}
-          score={score}
-          marks={marks}
-          autoIds={autoIds}
-          showNames={prefs.showNames}
-          showFingers={prefs.showFingers}
-          notation={prefs.notation}
-          loop={
-            sel.on && sel.a !== null
-              ? sel.b === null
-                ? { from: sel.a, to: null }
-                : { from: Math.min(sel.a, sel.b), to: Math.max(sel.a, sel.b) }
-              : null
-          }
-          onMeasure={sel.on ? (i) => setSel((s) => tapMeasure(s, i)) : undefined}
-        />
-        <div className="statusbar" aria-live="polite">
-          <span>{shownStatus[0]}</span>
-          <strong>{shownStatus[1]}</strong>
-        </div>
-      </div>
+      {board}
 
       <div className="controls">
         <button className="btn primary" onClick={toggleRun}>
           {running ? "Parar" : "Empezar"}
         </button>
-        {mode === "learn" && (
-          <label className="field">
-            <input type="checkbox" checked={prefs.learnAtTempo} onChange={(e) => settings.set({ learnAtTempo: e.target.checked })} /> A tempo
-          </label>
-        )}
+        {atTempoField}
         <div className="loop-ctl">
           <label className="field">
             <input type="checkbox" checked={sel.on} onChange={(e) => setSel((s) => toggleLoop(s, e.target.checked))} /> Bucle
@@ -267,56 +431,17 @@ function LessonView({ songId }: { songId: string }) {
               <span className="loop-range-label">
                 Compases {loopRange.from + 1}–{loopRange.to + 1}
               </span>
-              <span className="loop-edge">
-                {edge("from", -1, "Inicio un compás antes", "−")}
-                <span>inicio</span>
-                {edge("from", 1, "Inicio un compás después", "+")}
-              </span>
-              <span className="loop-edge">
-                {edge("to", -1, "Fin un compás antes", "−")}
-                <span>fin</span>
-                {edge("to", 1, "Fin un compás después", "+")}
-              </span>
+              {loopEdges}
             </>
           )}
         </div>
-        <label className="field" style={{ visibility: mode === "learn" && !prefs.learnAtTempo ? "hidden" : "visible" }}>
-          Tempo
-          <input type="range" min={40} max={140} step={5} value={tempo} onChange={(e) => setTempo(Number(e.target.value))} />
-          <output>{tempo}</output> ppm
-        </label>
-        <label className="field">
-          <input type="checkbox" checked={prefs.showNames} onChange={(e) => settings.set({ showNames: e.target.checked })} /> Nombres de las notas
-        </label>
-        <label className="field">
-          <input type="checkbox" checked={prefs.showFingers} onChange={(e) => settings.set({ showFingers: e.target.checked })} /> Números de dedo
-        </label>
+        {tempoField}
+        {viewFields}
       </div>
 
-      {result && (
-        <div className="result">
-          <div className="big">{result.score === null ? "♪" : `${Math.round(result.score * 100)}%`}</div>
-          {result.score !== null && (
-            <div className="rs" aria-label={`${result.stars} de 3 estrellas`}>
-              {"★".repeat(result.stars)}
-              {"☆".repeat(3 - result.stars)}
-            </div>
-          )}
-          <p>{result.message}</p>
-          <div className="acts">
-            <button className="btn" onClick={toggleRun}>
-              Repetir
-            </button>
-            {mode !== "play" && !result.loop && (
-              <button className="btn primary" onClick={() => setMode(mode === "listen" ? "learn" : "play")}>
-                Siguiente paso
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {resultCard}
 
-      <Keyboard ref={keys} low={range[0]} high={range[1]} guide={guide} onPress={press} notation={prefs.notation} />
+      {keyboard}
     </div>
   );
 }

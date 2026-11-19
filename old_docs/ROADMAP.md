@@ -17,7 +17,7 @@ Objetivo: un producto público para aprender piano desde cero con un teclado MID
 ## v0.4 · Calidad de práctica
 - Pantalla de lección adaptada a móvil apaisado (partitura y teclado sin desplazamiento).
 - Sonido de piano real (muestras) en lugar del sintetizador. ✅
-- Bucle de compases: repetir un fragmento difícil.
+- Bucle de compases: repetir un fragmento difícil.✅
 - Aprender con espera a tempo (la partitura avanza pero se detiene si fallas). ✅
 - App instalable (PWA) y uso sin conexión. ✅
 

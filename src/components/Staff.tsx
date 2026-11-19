@@ -1,8 +1,9 @@
-import { forwardRef, memo, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Score, ScoreNote } from "../music/types";
 import type { NoteMark } from "../engine/lesson";
 import { isWhite, noteName, staffStep, type Notation } from "../music/theory";
 import { STAFF_LEFT, measureAt } from "../music/score";
+import { fitScale } from "../ui/layout";
 
 /** Medio espacio entre líneas, en px. */
 const H = 6;
@@ -32,11 +33,23 @@ interface Props {
   loop?: { from: number; to: number | null } | null;
   /** Si existe, tocar la partitura elige un compás. */
   onMeasure?: (i: number) => void;
+  /** Ajustar al alto del contenedor: recorta el margen vertical y escala (móvil apaisado). */
+  fit?: boolean;
 }
 
-export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, marks, autoIds, showNames, showFingers, notation = "latin", loop = null, onMeasure }, ref) {
+/** Margen alrededor del contenido medido, en unidades de la partitura. */
+const FIT_PAD = 6;
+
+export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, marks, autoIds, showNames, showFingers, notation = "latin", loop = null, onMeasure, fit = false }, ref) {
   const wrap = useRef<HTMLDivElement>(null);
   const head = useRef<SVGLineElement>(null);
+  const content = useRef<SVGGElement>(null);
+  // con fit: franja vertical que ocupa el dibujo y alto disponible del contenedor
+  const [box, setBox] = useState<{ y: number; h: number } | null>(null);
+  const [avail, setAvail] = useState(0);
+  const scale = fit && box ? fitScale(box.h, avail) : 1;
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
 
   useImperativeHandle(ref, () => ({
     setPlayhead(x) {
@@ -52,7 +65,7 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
     scrollTo(x, smooth) {
       const w = wrap.current;
       if (!w) return;
-      const left = Math.max(0, x - w.clientWidth * 0.3);
+      const left = Math.max(0, x * scaleRef.current - w.clientWidth * 0.3);
       if (smooth) w.scrollTo({ left, behavior: "smooth" });
       else w.scrollLeft = left;
     },
@@ -64,6 +77,33 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
   const top = TREBLE_BOTTOM - 8 * H;
   const bottom = twoHands ? BASS_BOTTOM : TREBLE_BOTTOM;
   const labelRow = { R: twoHands ? 228 : 166, L: 248 };
+
+  useLayoutEffect(() => {
+    if (!fit) {
+      setBox(null);
+      return;
+    }
+    const measure = () => {
+      const g = content.current;
+      if (!g) return;
+      const b = g.getBBox();
+      setBox({ y: b.y - FIT_PAD, h: b.height + 2 * FIT_PAD });
+    };
+    measure();
+    // las fuentes musicales cambian el tamaño de claves y silencios al cargar
+    document.fonts?.ready.then(measure);
+  }, [fit, score, showNames, showFingers, notation]);
+
+  useEffect(() => {
+    const w = wrap.current;
+    if (!fit || !w || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setAvail(w.clientHeight));
+    ro.observe(w);
+    setAvail(w.clientHeight);
+    return () => ro.disconnect();
+  }, [fit]);
+
+  const view = fit && box ? box : { y: 0, h: height };
 
   // las alteraciones se muestran una vez por compás; un becuadro anula el sostenido
   const accidentals = useMemo(() => {
@@ -91,10 +131,10 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
           ((e) => {
             // el rectángulo del <svg> ya se mueve con el scroll del contenedor
             const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
-            onMeasure(measureAt(score, x));
+            onMeasure(measureAt(score, x / scale));
           })
         }
-        width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Partitura de ${score.song.title}`}>
+        width={width * scale} height={view.h * scale} viewBox={`0 ${view.y} ${width} ${view.h}`} role="img" aria-label={`Partitura de ${score.song.title}`}>
         {loop && (
           <rect
             className="loop-range"
@@ -105,6 +145,7 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
             rx={6}
           />
         )}
+        <g ref={content}>
         <Lines y={TREBLE_BOTTOM} width={width} />
         <text x={12} y={TREBLE_BOTTOM - 2 * H} fontSize={8 * H} className="glyph">{"\u{1D11E}"}</text>
         <TimeSig y={TREBLE_BOTTOM} top={bar} />
@@ -145,6 +186,7 @@ export const Staff = forwardRef<StaffHandle, Props>(function Staff({ score, mark
             notation={notation}
           />
         ))}
+        </g>
         <line ref={head} x1={0} x2={0} y1={top - 18} y2={bottom + 30} className="playhead" opacity={0} />
       </svg>
     </div>
