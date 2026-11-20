@@ -120,8 +120,8 @@ entero, Repetir, Siguiente paso y Cerrar funcionan y la disposición no cambia (
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T016 Ejecutar `npm test` y `npm run build` y corregir lo que falle (tests anteriores sin cambios)
-- [ ] T017 Recorrer [quickstart.md](quickstart.md) §2 completo: 640 × 320, 667 × 375 y 844 × 390 en modo responsive (las 12 piezas × 3 pasos, SC-001/002), comparar escritorio y tablet con las capturas de T001 (SC-005) y probar en un móvil real con barra del navegador visible/oculta y como app instalada (SC-003, SC-006, FR-011, FR-012)
-- [ ] T018 [P] Si en T017 alguna pieza queda con la partitura por debajo de la escala 0,55 o algún elemento no cabe en 640 × 320, ajustar los altos de la rejilla en `src/styles.css` (fila, estado, `clamp` del teclado respetando el mínimo de 110) y anotar el cambio en `specs/005-leccion-movil-apaisado/research.md` (R2)
+- [X] T017 Recorrer [quickstart.md](quickstart.md) §2 completo: 640 × 320, 667 × 375 y 844 × 390 en modo responsive (las 12 piezas × 3 pasos, SC-001/002), comparar escritorio y tablet con las capturas de T001 (SC-005) y probar en un móvil real con barra del navegador visible/oculta y como app instalada (SC-003, SC-006, FR-011, FR-012)
+- [X] T018 [P] Si en T017 alguna pieza queda con la partitura por debajo de la escala 0,55 o algún elemento no cabe en 640 × 320, ajustar los altos de la rejilla en `src/styles.css` (fila, estado, `clamp` del teclado respetando el mínimo de 110) y anotar el cambio en `specs/005-leccion-movil-apaisado/research.md` (R2)
 
 ---
 
