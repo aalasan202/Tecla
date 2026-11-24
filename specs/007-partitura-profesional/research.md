@@ -51,12 +51,24 @@ Decisiones de la Fase 0. Cada una con lo decidido, por qué y qué se descartó.
 - **Razón**: el motor ya funciona con un tiempo proporcional a la distancia (cursor a velocidad
   constante, Aprender a tempo). Con el formateo propio de VexFlow el cursor iría a tirones. Además
   así las posiciones son puras y se prueban en `node` (VexFlow mide texto con un `<canvas>`).
-- **`px` por defecto**: 50 por negra como hoy; si la pieza tiene semicorcheas o tresillos, el
-  mínimo sube para que dos inicios seguidos queden a ≥ 18 px (`px ≥ 18 / menor separación`).
+- **`px` por defecto**: 50 por negra como hoy; si la pieza tiene notas muy seguidas, el
+  mínimo sube para que dos inicios seguidos queden a ≥ 26 px (`px ≥ 26 / menor separación`).
+  Se empezó con 18 px; en la prueba de «Greensleeves» los nombres («Sol♯») y las alteraciones
+  de las semicorcheas se pisaban, así que se subió a 26 px (las corcheas pasan de 50 a 52 px).
 - **Riesgo**: VexFlow podría recolocar modificadores (alteraciones, puntillos) al fijar las `x`.
   Primera tarea de la implementación: prueba visual de un compás con acorde en segunda,
   alteraciones y tresillo. **Alternativa** si falla: dejar formatear a VexFlow por compás con el
   ancho que da `layout.ts` y leer de vuelta la `x` de cada `TickContext` para construir `xAt`.
+
+- **Resultado de la prueba** (2026-11-24, `spike/vexflow.html`, Chromium): un 4/4 con armadura de
+  Sol, acorde Do–Re–Sol (segunda), Fa con becuadro, tresillo de corcheas, corchea con puntillo +
+  semicorchea, negra con puntillo y acordes en clave de fa. Tras `Formatter.format`, fijar
+  `tickContext.setX(x)` coloca cada inicio en su `x` y las alteraciones, puntillos, cabezas
+  desplazadas, barras y el «3» del tresillo se mueven con la nota sin descolocarse. La cabeza
+  queda en `stave.getNoteStartX() + Stave.padding + x`; el renderizador corrige ese desfase para
+  que el centro de la cabeza caiga en la `x` de `layout`. El tresillo debe crearse antes de
+  añadir las notas a la `Voice` (si no, «Too many ticks»). **Se adopta la decisión de R2**; la
+  alternativa no hace falta.
 
 ## R3 · Modelo de datos ampliado y compatible
 

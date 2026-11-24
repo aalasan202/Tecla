@@ -51,3 +51,17 @@ con acordes, ligaduras, armadura, semicorcheas, tresillos y 6/8 en `dev-fixtures
    se dibuja (FR-007).
 10. En un móvil de gama media: tiempo hasta ver la partitura de una pieza de 100 y de 300 compases
     (< 1 s y < 2 s, SC-004) y respuesta a la nota y cursor en ambas (SC-005). Anotar aquí.
+
+    **Medida de referencia (2026-11-24)**, sin móvil real: Chromium de escritorio con la CPU
+    frenada ×4 (aproximación a un móvil de gama media), build de producción, desde que se abre la
+    ruta de la lección hasta que se ve la partitura:
+
+    | Pieza | Dibujo de una vez | Por tramos de 8 compases (R10) |
+    |-------|-------------------|--------------------------------|
+    | 80 compases (390 notas) | 1,6 s | **0,98 s** |
+    | 320 compases (1560 notas) | 5,5 s | **1,26 s** (el resto se dibuja en segundo plano en ≈ 6 s) |
+
+    Pulsación → marca: 18–33 ms (la primera pulsación de la sesión, ≈ 210 ms: arranca el audio).
+    Dibujar de una vez no cumplía SC-004, así que se dibuja por tramos: los visibles al abrir, los
+    siguientes al acercarse el cursor o cuando el navegador está libre. **Pendiente**: repetir la
+    medida en un móvil real.

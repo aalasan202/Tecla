@@ -24,11 +24,11 @@ src/
   screens/      Inicio, Canciones, Lección, Piano libre, Progreso y Ajustes
   state/        ajustes y progreso guardados en el navegador
   router.ts     rutas por hash (#canciones, #leccion/oda2, #piano…)
-  music/        teoría (nombres, posiciones), canciones, partitura y digitación
+  music/        teoría, canciones, partitura lógica, ortografía, grabado, posiciones y digitación (sin DOM)
   engine/       motor de lección (Escuchar / Aprender / Tocar), sin DOM
   audio/        sintetizador Web Audio
   midi/         Web MIDI: una conexión para toda la app (MidiProvider)
-  components/   Partitura (SVG), Teclado, barra superior, iconos
+  components/   Partitura (ScoreView, con VexFlow), Teclado, barra superior, iconos
   App.tsx       elige la pantalla según la ruta y aplica el tema
 prototype/      el prototipo original en un solo archivo, como referencia
 ```
@@ -38,6 +38,15 @@ El motor (`src/engine/lesson.ts`) no toca el DOM: recibe un `LessonHost` con cal
 ### Añadir una canción
 
 En `src/music/songs.ts`, cada pista es una lista de `[nota MIDI, duración en pulsos]`; `0` es un silencio. Do central = 60. Las piezas a dos manos usan `r` y `l`; las de una mano, `n`. Los tests comprueban que cada mano llena compases completos.
+
+Además (desde 007):
+
+- **Acordes**: un array de notas, `[[48, 52, 55], 2]`.
+- **Opciones** como tercer elemento: `{ tie: true }` liga con el evento siguiente (mismas notas), `{ slur: "start" }` / `{ slur: "end" }` para ligaduras de expresión y `{ spell: "b" }` para forzar la ortografía (Re♭ en vez de Do♯).
+- **Duraciones** en negras, también tercios (`1/3`, tresillos) y cuartos (`0.25`, semicorcheas). Una duración sin figura propia (`2.5`) se escribe tal cual: la partitura la parte en figuras ligadas.
+- **Pieza**: `key` (armadura, −7 bemoles … +7 sostenidos), `keyChanges` (`[{ at: compás, key }]`) y `time: "6/8"` (el tempo va entonces en negras con puntillo por minuto).
+
+La partitura se dibuja con [VexFlow](https://www.vexflow.com/) 5.0.0 (licencia MIT), en un chunk aparte que solo carga la lección.
 
 ## Despliegue
 
