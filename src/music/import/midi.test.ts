@@ -129,3 +129,17 @@ describe("archivos MIDI no válidos", () => {
     expect(raw.notPiano).toBe(false);
   });
 });
+
+describe("armadura en MIDI (007)", () => {
+  it("lee el meta FF 59 como armadura con su pulso", () => {
+    const minueto = SONGS.find((s) => s.id === "minueto")!;
+    const raw = midiToRaw(parseMidi(songToMidi(minueto)), "m.mid");
+    expect(raw.keys).toEqual([{ at: 0, key: 1 }]);
+    const flats = midiToRaw(parseMidi(songToMidi({ ...minueto, key: -3 })), "m.mid");
+    expect(flats.keys).toEqual([{ at: 0, key: -3 }]);
+  });
+
+  it("sin meta de armadura no hay keys", () => {
+    expect(midiToRaw(parseMidi(songToMidi(SONGS[0])), "c.mid").keys).toBeUndefined();
+  });
+});

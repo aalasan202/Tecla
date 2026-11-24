@@ -1,14 +1,16 @@
 import { convertPiece } from "../music/import/convert";
+import { convertFull } from "../music/import/full";
 import { ImportError } from "../music/import/errors";
 import { fnv1a64 } from "../music/import/hash";
 import { midiToRaw, parseMidi } from "../music/import/midi";
-import type { ImportCheck, RawPiece, SourceFormat } from "../music/import/types";
+import type { FullCheck, ImportCheck, RawPiece, SourceFormat } from "../music/import/types";
 import { parseMusicXml } from "./musicxml";
 import { unzipMxl } from "./mxl";
 
 export const MAX_BYTES = 5 * 1024 * 1024;
 
-export type FileCheck = ImportCheck & { bytes?: Uint8Array; hash?: string; format?: SourceFormat };
+/** Resultado de comprobar un archivo; si vale, con la versión completa (007) junto a la simplificada. */
+export type FileCheck = ImportCheck & { bytes?: Uint8Array; hash?: string; format?: SourceFormat; full?: FullCheck };
 
 /** Cede el hilo para que la interfaz siga respondiendo, y para si se ha cancelado (FR-017). */
 async function pause(signal: AbortSignal) {
@@ -54,10 +56,17 @@ export async function checkFile(file: File, signal: AbortSignal): Promise<FileCh
     await pause(signal);
     const result = convertPiece(raw);
     await pause(signal);
-    return { ...result, bytes, hash: fnv1a64(bytes), format: raw.format };
+    const full = result.ok ? convertFull(raw) : undefined;
+    await pause(signal);
+    return { ...result, bytes, hash: fnv1a64(bytes), format: raw.format, ...(full ? { full } : {}) };
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     if (e instanceof ImportError) return { ok: false, reason: e.reason, detail: e.detail };
     return { ok: false, reason: "unreadable" };
   }
+}
+
+/** Vuelve a leer un original guardado (para calcular la versión completa de una importada de 006). */
+export function rawFromBytes(bytes: Uint8Array, name: string): Promise<RawPiece> {
+  return read(bytes, name, new AbortController().signal);
 }

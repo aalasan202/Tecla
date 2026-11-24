@@ -1,10 +1,12 @@
-import type { SongDef } from "../types";
+import type { SongDef, Spell } from "../types";
 
 /** Nota leída de un archivo, en pulsos de negra sin cuantizar. Las ligadas ya vienen unidas. */
 export interface RawNote {
   pitch: number;
   start: number;
   dur: number;
+  /** Alteración escrita en el original (MusicXML `<alter>`), si la hay. */
+  spell?: Spell;
 }
 
 export interface RawPart {
@@ -24,6 +26,8 @@ export interface RawPiece {
   tempo?: number;
   /** Compases con su pulso de inicio; vacío = 4/4. */
   times: { at: number; beats: number; beatType: number }[];
+  /** Armaduras (−7…7) con su pulso de inicio; vacío = Do mayor. */
+  keys?: { at: number; key: number }[];
   parts: RawPart[];
   notPiano: boolean;
   ignored: { grace: number; cue: number };
@@ -77,8 +81,26 @@ export interface Proposal {
 
 export type ImportCheck = { ok: false; reason: RejectReason; detail?: RejectDetail } | { ok: true; proposal: Proposal };
 
+/** Por qué no hay versión completa (FR-019c). */
+export type FullReason = "voices" | "timeSignature" | "timeChange" | "unreadable";
+
+/** Resultado de convertir el original sin simplificar (007). */
+export type FullCheck =
+  | { ok: true; song: Omit<SongDef, "id" | "level">; level: Level; warnings: Warning[] }
+  | { ok: false; reason: FullReason };
+
+export type SongVersion = "simple" | "full";
+
+/** Versión completa guardada: su definición (id de la simplificada + «.full») o por qué no la hay. */
+export type FullVersion = { def: SongDef; level: Level; warnings: Warning[] } | { unavailable: FullReason };
+
 export interface ImportedSong {
+  /** Versión simplificada (006). */
   def: SongDef;
+  /** Versión completa; ausente = aún sin calcular (piezas importadas antes de 007). */
+  full?: FullVersion;
+  /** Versión elegida; ausente = "simple" (FR-019a). */
+  version?: SongVersion;
   source: { format: SourceFormat; fileName: string; size: number };
   /** FNV-1a de 64 bits del archivo, 16 hex. */
   hash: string;

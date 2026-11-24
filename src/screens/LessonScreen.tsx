@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findSong } from "../state/library";
+import { baseId } from "../state/imported";
 import { buildScore, measureCount } from "../music/score";
 import { noteName } from "../music/theory";
+import { noteLabel } from "../music/spelling";
 import type { ScoreNote } from "../music/types";
 import { Lesson, type HandChoice, type LessonResult, type Mode, type NoteMark } from "../engine/lesson";
 import { canNudge, emptySelection, nudge, rangeOf, tapMeasure, toggleLoop, type FragmentEdge, type FragmentSelection } from "../engine/fragment";
@@ -9,7 +11,7 @@ import { ensureAudio, playClick, playTone } from "../audio/synth";
 import { useMidiInput } from "../midi/MidiProvider";
 import { settings } from "../state/settings";
 import { addPractice, progress, recordSession, recordStars } from "../state/progress";
-import { Staff, type StaffHandle } from "../components/Staff";
+import { ScoreView, type StaffHandle } from "../components/ScoreView";
 import { Keyboard, type KeyboardHandle } from "../components/Keyboard";
 import { ConnectionStatus, TopBar } from "../components/TopBar";
 import { Popover } from "../components/Popover";
@@ -57,7 +59,9 @@ function LessonView({ songId }: { songId: string }) {
   const song = findSong(songId)!;
   const score = useMemo(() => buildScore(song), [song]);
   const prefs = settings.use();
-  const resume = progress.get().last?.songId === songId ? progress.get().last : null;
+  // «Continuar» tras cambiar de versión una importada: se retoma en el mismo paso
+  const lastId = progress.get().last?.songId;
+  const resume = lastId !== undefined && baseId(lastId) === baseId(songId) ? progress.get().last : null;
 
   const [mode, setMode] = useState<Mode>(resume?.mode ?? "listen");
   const [hands, setHands] = useState<HandChoice>(score.twoHands ? (resume?.hands ?? "both") : "both");
@@ -65,6 +69,8 @@ function LessonView({ songId }: { songId: string }) {
   const [marks, setMarks] = useState<Record<number, NoteMark>>({});
   const [guide, setGuide] = useState<ScoreNote[]>([]);
   const [status, setStatus] = useState<[string, string]>(["Pulsa Empezar", ""]);
+  // la partitura ya está dibujada: hasta entonces la lección no empieza
+  const [ready, setReady] = useState(false);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<(LessonResult & { loop?: boolean }) | null>(null);
   // fragmento en bucle: vive mientras dura la lección (se pierde al salir o cambiar de pieza)
@@ -128,7 +134,7 @@ function LessonView({ songId }: { songId: string }) {
       now: () => performance.now(),
       frame: (cb) => requestAnimationFrame(cb),
       cancelFrame: (id) => cancelAnimationFrame(id),
-      name: (m) => noteName(m, notation.current),
+      name: (m, sp) => (sp ? noteLabel(sp, notation.current) : noteName(m, notation.current)),
       finish: (r) => {
         setRunning(false);
         setResult(r);
@@ -174,6 +180,7 @@ function LessonView({ songId }: { songId: string }) {
       }
       return;
     }
+    if (!ready) return;
     setResult(null);
     startedAt.current = performance.now();
     l.start();
@@ -226,7 +233,8 @@ function LessonView({ songId }: { songId: string }) {
     <label className="field" style={{ visibility: mode === "learn" && !prefs.learnAtTempo ? "hidden" : "visible" }}>
       Tempo
       <input type="range" min={40} max={140} step={5} value={tempo} onChange={(e) => setTempo(Number(e.target.value))} />
-      <output>{tempo}</output> ppm
+      {/* en 6/8 el pulso es la negra con puntillo (FR-012a) */}
+      <output>{tempo}</output> {score.pulse === 1.5 ? "♩. por minuto" : "ppm"}
     </label>
   );
   const viewFields = (
@@ -241,8 +249,9 @@ function LessonView({ songId }: { songId: string }) {
   );
   const board = (
     <div className="board">
-      <Staff
+      <ScoreView
         ref={staff}
+        onReady={() => setReady(true)}
         score={score}
         marks={marks}
         autoIds={autoIds}
@@ -325,7 +334,7 @@ function LessonView({ songId }: { songId: string }) {
               ))}
             </div>
           )}
-          <button className="btn primary" onClick={toggleRun}>
+          <button className="btn primary" onClick={toggleRun} disabled={!running && !ready}>
             {running ? "Parar" : "Empezar"}
           </button>
           <button type="button" className="loop-toggle" aria-label="Bucle" aria-pressed={sel.on} onClick={() => setSel((s) => toggleLoop(s, !s.on))}>
@@ -418,7 +427,7 @@ function LessonView({ songId }: { songId: string }) {
       {board}
 
       <div className="controls">
-        <button className="btn primary" onClick={toggleRun}>
+        <button className="btn primary" onClick={toggleRun} disabled={!running && !ready}>
           {running ? "Parar" : "Empezar"}
         </button>
         {atTempoField}

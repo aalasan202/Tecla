@@ -1,27 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { COUNT_IN, Lesson, groupByTime, starsFor, type LessonHost, type LessonResult } from "./lesson";
-import { STAFF_LEFT, buildScore } from "../music/score";
+import { COUNT_IN, Lesson, groupByTime, starsFor, type LessonHost } from "./lesson";
+import { buildScore } from "../music/score";
 import { SONGS } from "../music/songs";
-import type { SongDef } from "../music/types";
-
-function fakeHost(clock = { t: 0 }) {
-  const finished: LessonResult[] = [];
-  const host: LessonHost = {
-    mark: vi.fn(),
-    guide: vi.fn(),
-    status: vi.fn(),
-    playhead: vi.fn(),
-    scrollTo: vi.fn(),
-    flash: vi.fn(),
-    tone: vi.fn(),
-    click: vi.fn(),
-    finish: (r) => finished.push(r),
-    now: () => clock.t,
-    frame: () => 0,
-    cancelFrame: () => {},
-  };
-  return { host, finished, clock };
-}
+import type { Score, SongDef } from "../music/types";
+import { fakeHost } from "./testHost";
 
 const song = (id: string) => buildScore(SONGS.find((s) => s.id === id)!);
 
@@ -92,7 +74,18 @@ function tempoHost() {
 }
 
 /** Posición del cursor en pulsos a partir del último playhead. */
-const beatOf = (xs: (number | null)[], px: number) => ((xs[xs.length - 1] ?? NaN) - STAFF_LEFT - 16) / px;
+const beatOf = (xs: (number | null)[], score: Score) => {
+  const x = xs[xs.length - 1] ?? NaN;
+  // inversa de layout.xAt (estrictamente creciente) por bisección
+  let lo = -20;
+  let hi = score.total + 20;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (score.layout.xAt(mid) < x) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+};
 
 describe("Aprender a tempo", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -116,7 +109,7 @@ describe("Aprender a tempo", () => {
       while (i < score.notes.length && score.notes[i].s * 1000 <= clock.t) l.input(score.notes[i++].m);
       tick(100);
       if (finished.length) break;
-      const b = beatOf(xs, score.px);
+      const b = beatOf(xs, score);
       expect(b).toBeGreaterThan(prev);
       prev = b;
     }
@@ -132,13 +125,13 @@ describe("Aprender a tempo", () => {
     l.start();
     l.input(60);
     tick(1000);
-    expect(beatOf(xs, score.px)).toBeCloseTo(1);
+    expect(beatOf(xs, score)).toBeCloseTo(1);
     tick(500);
     tick(500);
-    expect(beatOf(xs, score.px)).toBeCloseTo(1);
+    expect(beatOf(xs, score)).toBeCloseTo(1);
     l.input(62);
     tick(100);
-    expect(beatOf(xs, score.px)).toBeCloseTo(1.1);
+    expect(beatOf(xs, score)).toBeCloseTo(1.1);
     l.stop();
   });
 
@@ -152,7 +145,7 @@ describe("Aprender a tempo", () => {
     l.input(61);
     expect(host.flash).toHaveBeenCalledWith(61, "wrong", 350);
     tick(500);
-    expect(beatOf(xs, score.px)).toBeCloseTo(1);
+    expect(beatOf(xs, score)).toBeCloseTo(1);
     for (const n of score.notes.slice(1)) l.input(n.m);
     for (let k = 0; k < 40 && !finished.length; k++) tick(500);
     expect(finished).toHaveLength(1);
@@ -169,7 +162,7 @@ describe("Aprender a tempo", () => {
     l.input(62); // pulso 1, por adelantado
     expect(host.mark).toHaveBeenCalledWith(score.notes[1].id, "hit");
     tick(600);
-    expect(beatOf(xs, score.px)).toBeCloseTo(1.1);
+    expect(beatOf(xs, score)).toBeCloseTo(1.1);
     const before = (host.flash as ReturnType<typeof vi.fn>).mock.calls.length;
     l.input(65); // la del pulso 3, con la del pulso 2 aún pendiente
     expect((host.flash as ReturnType<typeof vi.fn>).mock.calls.slice(before)).toContainEqual([65, "wrong", 350]);
@@ -184,10 +177,10 @@ describe("Aprender a tempo", () => {
     l.input(60);
     l.input(62);
     tick(500);
-    expect(beatOf(xs, score.px)).toBeCloseTo(0.5);
+    expect(beatOf(xs, score)).toBeCloseTo(0.5);
     l.tempo = 30;
     tick(1000);
-    expect(beatOf(xs, score.px)).toBeCloseTo(1);
+    expect(beatOf(xs, score)).toBeCloseTo(1);
     l.stop();
   });
 
@@ -199,14 +192,14 @@ describe("Aprender a tempo", () => {
     const l = new Lesson(score, "learn", "R", 60, host, { atTempo: true });
     l.start();
     tick(500);
-    expect(beatOf(xs, score.px)).toBeCloseTo(0);
+    expect(beatOf(xs, score)).toBeCloseTo(0);
     expect(toned(48)).toBe(false); // la izquierda del pulso 0 espera a la derecha
     l.input(64);
     tick(16);
     expect(toned(48)).toBe(true);
     for (const m of [64, 65, 67]) l.input(m); // pulsos 1, 2 y 3
     tick(5000);
-    expect(beatOf(xs, score.px)).toBeCloseTo(4);
+    expect(beatOf(xs, score)).toBeCloseTo(4);
     expect(toned(55)).toBe(false); // la izquierda del pulso 4
     l.input(67);
     tick(16);
@@ -221,10 +214,10 @@ describe("Aprender a tempo", () => {
     l.start();
     l.input(64);
     tick(1000);
-    expect(beatOf(xs, score.px)).toBeCloseTo(0);
+    expect(beatOf(xs, score)).toBeCloseTo(0);
     l.input(48);
     tick(500);
-    expect(beatOf(xs, score.px)).toBeCloseTo(0.5);
+    expect(beatOf(xs, score)).toBeCloseTo(0.5);
     l.stop();
   });
 });
@@ -301,13 +294,13 @@ describe("Bucle — Aprender", () => {
     const l = new Lesson(score, "learn", "both", 60, host, { atTempo: true, loop: { from: 2, to: 2 } });
     l.start();
     tick(16);
-    expect(beatOf(xs, score.px)).toBeCloseTo(8, 1);
+    expect(beatOf(xs, score)).toBeCloseTo(8, 1);
     for (const n of frag) l.input(n.m);
     let wrapped = false;
     let prev = 8;
     for (let k = 0; k < 50 && !wrapped; k++) {
       tick(100);
-      const b = beatOf(xs, score.px);
+      const b = beatOf(xs, score);
       if (b < prev) wrapped = true;
       prev = b;
     }
@@ -445,5 +438,244 @@ describe("utilidades", () => {
 
   it("convierte porcentajes en estrellas", () => {
     expect([0.2, 0.4, 0.7, 0.9].map(starsFor)).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe("posiciones y tempo desde la partitura (007)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("segundos por negra = 60 / (tempo · pulso)", () => {
+    const { host } = fakeHost();
+    const l = new Lesson(song("minueto"), "play", "both", 90, host);
+    expect(l.spb).toBeCloseTo(60 / 90);
+  });
+
+  it("en Tocar el cursor pasa por layout.xAt(pulso)", () => {
+    const { host, clock, tick, xs } = tempoHost();
+    const score = song("minueto");
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    for (const beat of [0, 1.5, 4, 7.25]) {
+      clock.t = (COUNT_IN + beat) * 1000 - 16;
+      tick(16);
+      expect(xs[xs.length - 1]).toBeCloseTo(score.layout.xAt(beat));
+    }
+    l.stop();
+  });
+});
+
+describe("acordes (007, historia 1)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  // Do–Mi–Sol de blanca y luego Re de blanca, a una mano
+  const chord = () => buildScore({ id: "ac", title: "ac", level: "", tempo: 60, n: [[[60, 64, 67], 2], [62, 2]] });
+  const markOf = (host: LessonHost, id: number) => {
+    const calls = (host.mark as Mock).mock.calls.filter((c) => c[0] === id);
+    return calls.length ? calls[calls.length - 1][1] : undefined;
+  };
+
+  it("Aprender espera todas las notas del acorde, en cualquier orden", () => {
+    const { host } = fakeHost();
+    const score = chord();
+    const l = new Lesson(score, "learn", "both", 60, host);
+    l.start();
+    const [c, e, g, d] = score.notes;
+    l.input(67);
+    l.input(60);
+    expect(markOf(host, g.id)).toBe("hit");
+    expect(markOf(host, c.id)).toBe("hit");
+    expect(markOf(host, e.id)).toBe("now");
+    expect(markOf(host, d.id)).toBe(null);
+    l.input(64);
+    expect(markOf(host, e.id)).toBe("hit");
+    expect(markOf(host, d.id)).toBe("now");
+    l.stop();
+  });
+
+  it("Tocar: el acorde con sus tres notas cuenta como un acierto", () => {
+    const { host, clock } = fakeHost();
+    const score = chord();
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    clock.t = COUNT_IN * 1000;
+    l.input(60);
+    l.input(64);
+    clock.t += 100;
+    l.input(67);
+    clock.t = (COUNT_IN + 2) * 1000;
+    l.input(62);
+    // dos unidades (acorde y Re), las dos perfectas
+    expect(l.result().score).toBeCloseTo(1);
+    l.stop();
+  });
+
+  it("Tocar: si falta una nota, el acorde es un fallo y esa nota se marca fallada", () => {
+    const { host, clock, tick } = tempoHost();
+    const score = chord();
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    clock.t = COUNT_IN * 1000;
+    l.input(60);
+    l.input(64);
+    l.input(61); // nota equivocada: no anula las acertadas
+    runTo(host, tick, (COUNT_IN + 1) * 1000);
+    const [c, e, g] = score.notes;
+    expect(markOf(host, c.id)).toBe("hit");
+    expect(markOf(host, e.id)).toBe("hit");
+    expect(markOf(host, g.id)).toBe("miss");
+    clock.t = (COUNT_IN + 2) * 1000;
+    l.input(62);
+    // acorde fallado (0) + Re perfecto (1), menos la nota de más; entre dos unidades
+    expect(l.result().score).toBeCloseTo((1 - 0.25) / 2);
+    l.stop();
+  });
+
+  it("Escuchar: las notas del acorde se marcan a la vez", () => {
+    const { host, tick } = tempoHost();
+    const score = chord();
+    const l = new Lesson(score, "listen", "both", 60, host);
+    l.start();
+    tick(400);
+    const [c, e, g] = score.notes;
+    expect([markOf(host, c.id), markOf(host, e.id), markOf(host, g.id)]).toEqual(["now", "now", "now"]);
+    l.stop();
+  });
+});
+
+describe("notas ligadas (007, historia 3)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  // compás 0: Do blanca + Mi blanca ligada a Mi negra del compás 1; luego Re + Do
+  const tied = () =>
+    buildScore({ id: "tie", title: "tie", level: "", tempo: 60, n: [[60, 2], [64, 2, { tie: true }], [64, 1], [62, 1], [60, 2]] });
+
+  it("Aprender: la nota ligada se toca una vez", () => {
+    const { host, finished } = fakeHost();
+    const score = tied();
+    expect(score.notes).toHaveLength(4);
+    const l = new Lesson(score, "learn", "both", 60, host);
+    l.start();
+    for (const m of [60, 64, 62, 60]) l.input(m);
+    vi.runAllTimers();
+    expect(finished).toHaveLength(1);
+    expect(finished[0].score).toBe(1);
+  });
+
+  it("Tocar: la nota ligada cuenta como una sola nota acertada", () => {
+    const { host, clock } = fakeHost();
+    const score = tied();
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    for (const n of score.notes) {
+      clock.t = (COUNT_IN + n.s) * 1000;
+      l.input(n.m);
+    }
+    expect(l.result().score).toBe(1);
+    l.stop();
+  });
+
+  it("un bucle que empieza donde continúa una ligada no la exige", () => {
+    const { host, finished } = fakeHost();
+    const score = tied();
+    const l = new Lesson(score, "learn", "both", 60, host, { loop: { from: 1, to: 1 } });
+    l.start();
+    // el fragmento empieza en Re (pulso 5): la continuación de Mi no se pide
+    expect(lastCall(host.guide)[0].map((n: { m: number }) => n.m)).toEqual([62]);
+    l.stop();
+    expect(finished).toHaveLength(0);
+  });
+
+  it("una ligada que sale del fragmento suena solo hasta su final", () => {
+    const { host, tick } = tempoHost();
+    const score = tied();
+    const l = new Lesson(score, "listen", "both", 60, host, { loop: { from: 0, to: 0 } });
+    l.start();
+    tick(400);
+    tick(2000);
+    const tone = (host.tone as Mock).mock.calls.find((c) => c[0] === 64);
+    // Mi dura 3 pulsos, pero el fragmento acaba en el pulso 4: suena 2 s (≈ 0,95 · 2)
+    expect(tone?.[1]).toBeCloseTo(2 * 0.95);
+    l.stop();
+  });
+});
+
+describe("6/8 y ritmos rápidos (007, historia 6)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  const sixEight = () =>
+    buildScore({ id: "68", title: "68", level: "", tempo: 60, time: "6/8", n: [[60, 1.5], [62, 1.5], [64, 0.5], [65, 0.5], [67, 0.5], [69, 1.5]] });
+
+  it("6/8: el tempo va en negras con puntillo (60 → 2/3 s por negra)", () => {
+    const { host } = fakeHost();
+    expect(new Lesson(sixEight(), "play", "both", 60, host).spb).toBeCloseTo(2 / 3);
+  });
+
+  it("6/8: dos clics por compás, fuerte en el primero; la cuenta atrás son 4 pulsos", () => {
+    const { host, tick } = tempoHost();
+    const score = sixEight();
+    const l = new Lesson(score, "play", "both", 60, host); // 1 pulso (♩.) = 1000 ms
+    l.start();
+    runTo(host, tick, 8000);
+    const clicks = (host.click as Mock).mock.calls.map((c) => c[0]);
+    // 4 de cuenta atrás + 4 de la pieza (2 compases)
+    expect(clicks).toEqual([true, false, true, false, true, false, true, false]);
+    l.stop();
+  });
+
+  it("en 4/4 el metrónomo sigue marcando cada negra", () => {
+    const { host, tick } = tempoHost();
+    const l = new Lesson(song("cinco"), "play", "both", 60, host);
+    l.start();
+    runTo(host, tick, 6000);
+    // 4 de cuenta atrás y los pulsos 0, 1 y 2 de la pieza (el 2 cae justo en 6000 ms)
+    expect((host.click as Mock).mock.calls.map((c) => c[0])).toEqual([true, false, false, false, true, false, false]);
+    l.stop();
+  });
+
+  it("un tresillo se espera a un tercio de pulso del anterior", () => {
+    const { host, clock } = fakeHost();
+    const score = buildScore({ id: "t", title: "t", level: "", tempo: 60, n: [[60, 1 / 3], [62, 1 / 3], [64, 1 / 3], [65, 3]] });
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    for (const [m, beat] of [[60, 0], [62, 1 / 3], [64, 2 / 3], [65, 1]] as const) {
+      clock.t = (COUNT_IN + beat) * 1000;
+      l.input(m);
+    }
+    expect(l.result().score).toBe(1);
+    l.stop();
+  });
+
+  it("corchea con puntillo y semicorchea: a 0,75 y 0,25, con el margen recortado", () => {
+    const { host, clock } = fakeHost();
+    const score = buildScore({ id: "t", title: "t", level: "", tempo: 60, n: [[60, 0.75], [62, 0.25], [64, 3]] });
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    // la semicorchea tocada 0,2 pulsos tarde ya no vale (margen 0,125)
+    clock.t = COUNT_IN * 1000;
+    l.input(60);
+    clock.t = (COUNT_IN + 0.95) * 1000;
+    l.input(62);
+    clock.t = (COUNT_IN + 1) * 1000;
+    l.input(64);
+    expect(l.result().score).toBeCloseTo((1 + 0 + 1 - 0.25) / 3);
+    l.stop();
+  });
+});
+
+describe("Greensleeves (SC-007)", () => {
+  it("tocada a tempo con las dos manos da 3 estrellas", () => {
+    const { host, clock } = fakeHost();
+    const score = song("greensleeves");
+    const l = new Lesson(score, "play", "both", score.song.tempo, host);
+    l.start();
+    const presses = [...score.notes].sort((a, b) => a.s - b.s);
+    for (const n of presses) {
+      clock.t = (COUNT_IN * score.pulse + n.s) * l.spb * 1000;
+      l.input(n.m);
+    }
+    expect(l.result().stars).toBe(3);
+    expect(l.result().score).toBe(1);
+    l.stop();
   });
 });

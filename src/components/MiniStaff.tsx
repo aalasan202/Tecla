@@ -5,7 +5,11 @@ import type { SongDef } from "../music/types";
 
 /** Primeras notas de la mano derecha de una canción, en un pentagrama decorativo. */
 export function MiniStaff({ song, progress }: { song: SongDef; progress: number }) {
-  const notes = useMemo(() => buildScore(song).notes.filter((n) => n.h === "R").slice(0, 10), [song]);
+  // de un acorde se pinta la nota más aguda
+  const notes = useMemo(() => {
+    const right = buildScore(song).notes.filter((n) => n.h === "R");
+    return right.filter((n) => !right.some((o) => o.unit === n.unit && o.m > n.m)).slice(0, 10);
+  }, [song]);
   const W = 360;
   const H = 120;
   const bottom = 86;

@@ -7,6 +7,7 @@ export type MidiEvent =
   | { tick: number; type: "program"; channel: number; program: number }
   | { tick: number; type: "tempo"; usPerQuarter: number }
   | { tick: number; type: "time"; beats: number; beatType: number }
+  | { tick: number; type: "key"; key: number }
   | { tick: number; type: "name"; text: string }
   | { tick: number; type: "end" };
 
@@ -98,6 +99,10 @@ function readTrack(r: Reader): MidiTrack {
         track.events.push({ tick, type: "tempo", usPerQuarter: (data[0] << 16) | (data[1] << 8) | data[2] });
       } else if (type === 0x58 && data.length >= 2) {
         track.events.push({ tick, type: "time", beats: data[0], beatType: 2 ** data[1] });
+      } else if (type === 0x59 && data.length >= 1) {
+        // armadura: número de sostenidos (+) o bemoles (−), con signo
+        const key = data[0] > 127 ? data[0] - 256 : data[0];
+        if (key >= -7 && key <= 7) track.events.push({ tick, type: "key", key });
       }
       continue;
     }
@@ -206,6 +211,9 @@ export function midiToRaw(midi: MidiFile, fileName: string): RawPiece {
   const times = all
     .flatMap((e) => (e.type === "time" ? [{ at: e.tick / q, beats: e.beats, beatType: e.beatType }] : []))
     .sort((a, b) => a.at - b.at);
+  const keys = all
+    .flatMap((e) => (e.type === "key" ? [{ at: e.tick / q, key: e.key }] : []))
+    .sort((a, b) => a.at - b.at);
   const title = midi.tracks[0]?.name?.trim();
 
   return {
@@ -213,6 +221,7 @@ export function midiToRaw(midi: MidiFile, fileName: string): RawPiece {
     title: title || stripExt(fileName),
     tempo: tempoEvent && tempoEvent.type === "tempo" ? 60_000_000 / tempoEvent.usPerQuarter : 120,
     times,
+    ...(keys.length ? { keys } : {}),
     parts,
     notPiano,
     ignored: { grace: 0, cue: 0 },

@@ -29,11 +29,14 @@ function onsets(track: RawTrack): Set<number> {
 }
 
 export function measure(song: Omit<SongDef, "id" | "level">): Metrics {
-  const bar = song.bar ?? 4;
+  // en 6/8 el compás dura 3 negras
+  const bar = song.time === "6/8" ? 3 : song.bar ?? 4;
   const twoHands = !!song.l;
   const tracks = twoHands ? [song.r ?? [], song.l ?? []] : [song.n ?? []];
-  const notes = tracks.flat().filter(([m]) => m !== 0);
-  const right = tracks[0].filter(([m]) => m !== 0).map(([m]) => white(m));
+  // una entrada por altura (las de un acorde cuentan por separado)
+  const flat = (t: RawTrack) => t.flatMap(([m, d]) => (Array.isArray(m) ? m : m === 0 ? [] : [m]).map((p) => [p, d] as const));
+  const notes = tracks.flatMap(flat);
+  const right = flat(tracks[0]).map(([m]) => white(m));
   const length = Math.max(...tracks.map((t) => t.reduce((a, [, d]) => a + d, 0)));
 
   let simultaneousShare = 0;
@@ -62,4 +65,19 @@ export function suggestLevel(m: Metrics): Level {
   if (m.bar === 3 || m.accidentals > 0 || m.twoHands) return 3;
   if (m.rightSpan > LEVEL_RULES.span2 || m.eighthShare > LEVEL_RULES.eighths2) return 2;
   return 1;
+}
+
+/**
+ * Nivel de la versión completa (research R11): las reglas de 006 y además armadura distinta de
+ * Do o 6/8 → al menos 3; acordes de 3 o más notas, semicorcheas o tresillos en más del 10 % de
+ * los eventos → 4.
+ */
+export function suggestFullLevel(song: Omit<SongDef, "id" | "level">): Level {
+  let level = suggestLevel(measure(song));
+  if ((song.key ?? 0) !== 0 || song.keyChanges?.length || song.time === "6/8") level = Math.max(level, 3) as Level;
+  const tracks = song.l ? [song.r ?? [], song.l] : [song.n ?? []];
+  const events = tracks.flat().filter(([m]) => m !== 0);
+  const rich = events.filter(([m, d]) => (Array.isArray(m) && m.length >= 3) || Math.abs(d * 2 - Math.round(d * 2)) > 1e-9);
+  if (events.length && rich.length / events.length > 0.1) level = 4;
+  return level;
 }

@@ -1,11 +1,11 @@
 // Escribe en dev-fixtures/ archivos para probar a mano la importación (quickstart §3):
-// las 12 piezas del repertorio en MIDI y MusicXML, una melodía en una sola pista, una pieza
+// las piezas del repertorio en MIDI y MusicXML, una melodía en una sola pista, una pieza
 // muy larga y los archivos no válidos de los tests. Uso: node scripts/export-fixtures.mjs
 // (node 24 carga los .ts directamente; ambos módulos solo tienen `import type`).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { SONGS } from "../src/music/songs.ts";
-import { DOS_CUARTOS, nameMeta, songToMidi, songToMusicXml, tempoMeta, timeMeta, writeMidi } from "../src/music/import/fixtures.ts";
+import { DOS_CUARTOS, PRUEBA_COMPLETA, nameMeta, songToMidi, songToMusicXml, tempoMeta, timeMeta, twoVoicesXml, writeMidi } from "../src/music/import/fixtures.ts";
 
 const out = join(import.meta.dirname, "..", "dev-fixtures");
 mkdirSync(out, { recursive: true });
@@ -24,6 +24,12 @@ put("martinillo-una-pista.mid", songToMidi(byId("martinillo"), { singleTrack: tr
 
 // dos manos mezcladas en una pista: se reparten por el Do central (aviso «manos repartidas»)
 put("oda2-una-pista.mid", songToMidi(byId("oda2"), { singleTrack: true }));
+
+// versión completa (007): Sol mayor, acordes, tresillo y nota ligada; el resumen ofrece las dos versiones
+put("prueba-completa.mid", songToMidi(PRUEBA_COMPLETA));
+put("prueba-completa.musicxml", songToMusicXml(PRUEBA_COMPLETA));
+// dos voces en una mano: solo la versión simplificada, con el motivo
+put("dos-voces.musicxml", twoVoicesXml());
 
 // compás de 2/4 (clarificación 2026-11-24)
 put("dos-cuartos.mid", songToMidi(DOS_CUARTOS));
@@ -47,6 +53,7 @@ const voice = (pitch) => [
   { dt: 480, data: [0x80, pitch, 0] },
 ];
 put("tres-pistas.mid", writeMidi([[{ dt: 0, data: tempoMeta(90) }, ...voice(72)], voice(60), voice(48)]));
+// 6/8: desde 007 se admite (FR-020)
 put(
   "seis-octavos.musicxml",
   songToMusicXml(byId("oda")).replace(/<beats>\d+<\/beats>\s*<beat-type>\d+<\/beat-type>/, "<beats>6</beats><beat-type>8</beat-type>"),

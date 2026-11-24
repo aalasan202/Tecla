@@ -1,7 +1,7 @@
 import { SONGS } from "../music/songs";
 import { buildScore, measureCount } from "../music/score";
 import { progress, lastWeek, streak } from "../state/progress";
-import { findSong, repertoireStars } from "../state/library";
+import { findSong, repertoireStars, resolveSongId } from "../state/library";
 import { TopBar } from "../components/TopBar";
 import { MiniStaff } from "../components/MiniStaff";
 import { IconPiano, IconPlay, IconProgress, IconSettings, IconSongs } from "../components/Icons";
@@ -12,7 +12,8 @@ const HANDS_LABEL = { both: "", R: " · mano derecha", L: " · mano izquierda" }
 
 export function Home() {
   const p = progress.use();
-  const lastSong = p.last ? findSong(p.last.songId) : undefined;
+  // una importada abre la versión elegida, aunque se cambiara después de practicarla
+  const lastSong = p.last ? findSong(resolveSongId(p.last.songId)) : undefined;
   const last = lastSong ? p.last : null;
   const song = lastSong ?? SONGS[0];
   const measures = measureCount(buildScore(song));

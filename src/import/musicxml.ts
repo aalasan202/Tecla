@@ -1,5 +1,8 @@
 import { ImportError } from "../music/import/errors";
 import type { RawNote, RawPart, RawPiece } from "../music/import/types";
+import type { Spell } from "../music/types";
+
+const SPELL: Record<number, Spell> = { [-2]: "bb", [-1]: "b", 0: "n", 1: "#", 2: "##" };
 
 const STEP: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const BEAT_UNIT: Record<string, number> = { whole: 4, half: 2, quarter: 1, eighth: 0.5, "16th": 0.25 };
@@ -55,6 +58,9 @@ export function parseMusicXml(source: string, fileName: string): RawPiece {
           case "attributes": {
             const d = num(el, "divisions");
             if (d > 0) divisions = d;
+            const key = kid(el, "key");
+            const fifths = num(key, "fifths");
+            if (key && Number.isInteger(fifths) && fifths >= -7 && fifths <= 7) (piece.keys ??= []).push({ at: measureStart, key: fifths });
             const time = kid(el, "time");
             if (time && kid(time, "beats")) {
               const beats = num(time, "beats");
@@ -121,6 +127,8 @@ export function parseMusicXml(source: string, fileName: string): RawPiece {
               break;
             }
             const note: RawNote = { pitch: midi, start, dur };
+            // la alteración escrita (Fa♯ o Sol♭) se guarda para la versión completa
+            if (text(pitch, "alter") !== undefined && SPELL[Math.round(alter)]) note.spell = SPELL[Math.round(alter)];
             notes.push(note);
             if (ties.includes("start")) open.push({ note, staff });
             break;

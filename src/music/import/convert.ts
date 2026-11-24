@@ -1,6 +1,6 @@
 import type { RawTrack, SongDef } from "../types";
 import { measure, suggestLevel } from "./level";
-import type { ImportCheck, RawNote, RawPiece, Warning, WarningKind } from "./types";
+import type { ImportCheck, RawNote, RawPart, RawPiece, Warning, WarningKind } from "./types";
 
 /** Duraciones de nota que dibuja la partitura, en pulsos de negra. */
 export const DURATIONS: readonly number[] = [0.5, 1, 1.5, 2, 3, 4];
@@ -11,10 +11,18 @@ const TEMPO = { min: 40, max: 140, step: 5, fallback: 90 };
 /** Do central: desde aquí hacia arriba, mano derecha al repartir una sola pista. */
 const MIDDLE_C = 60;
 /** Desviación de la rejilla que se considera imprecisión de interpretación y no se avisa. */
-const SLACK = 0.05;
+export const SLACK = 0.05;
 const GRID = 0.5;
-/** Compases admitidos, todos en negras: 4/4, 3/4 y 2/4 (clarificación 2026-11-24). */
+/** Compases admitidos en negras: 4/4, 3/4 y 2/4 (clarificación 2026-11-24); y 6/8 (007, FR-020). */
 const BEATS: readonly number[] = [2, 3, 4];
+
+/** Compás admitido → negras por compás y pulso del metrónomo; null si no se admite. */
+export function meterOfTime(t: { beats: number; beatType: number } | undefined): { bar: number; pulse: number; six: boolean } | null {
+  if (!t) return { bar: 4, pulse: 1, six: false };
+  if (t.beatType === 4 && BEATS.includes(t.beats)) return { bar: t.beats, pulse: 1, six: false };
+  if (t.beatType === 8 && t.beats === 6) return { bar: 3, pulse: 1.5, six: true };
+  return null;
+}
 
 const SIMPLIFICATIONS: WarningKind[] = ["chords", "durations", "cutAtBar", "dropped"];
 const ORDER: WarningKind[] = ["handsSplit", "chords", "durations", "cutAtBar", "dropped", "grace", "farFromOriginal"];
@@ -93,10 +101,32 @@ function toTrack(hand: { s: number; d: number; m: number }[], total: number): Ra
   return out;
 }
 
-const clampTempo = (t: number | undefined) => {
+/** Tempo de la lección (pulsos por minuto, en pasos de 5) a partir de negras por minuto. */
+export const clampTempo = (t: number | undefined) => {
   if (t === undefined || !Number.isFinite(t) || t <= 0) return TEMPO.fallback;
   return Math.min(TEMPO.max, Math.max(TEMPO.min, Math.round(t / TEMPO.step) * TEMPO.step));
 };
+
+/**
+ * Reparte las partes en manos (006): dos partes por pentagrama o por altura media; una sola parte
+ * con notas simultáneas se parte por el Do central.
+ */
+export function splitHands(parts: RawPart[]): { right: RawNote[]; left: RawNote[] | null; split: boolean } {
+  if (parts.length === 2) {
+    const avg = (ns: RawNote[]) => ns.reduce((a, n) => a + n.pitch, 0) / ns.length;
+    const [a, b] = parts;
+    const aRight = a.staff && b.staff ? a.staff < b.staff : avg(a.notes) >= avg(b.notes);
+    return aRight ? { right: a.notes, left: b.notes, split: false } : { right: b.notes, left: a.notes, split: false };
+  }
+  const only = parts[0];
+  if (only.staff === 2) return { right: [], left: only.notes, split: false };
+  if (hasSimultaneous(only.notes)) {
+    const hi = only.notes.filter((n) => n.pitch >= MIDDLE_C);
+    const lo = only.notes.filter((n) => n.pitch < MIDDLE_C);
+    return lo.length ? { right: hi, left: lo, split: true } : { right: hi, left: null, split: false };
+  }
+  return { right: only.notes, left: null, split: false };
+}
 
 /** Comprueba y convierte una pieza leída en una propuesta de SongDef. Nunca lanza. */
 export function convertPiece(raw: RawPiece): ImportCheck {
@@ -113,46 +143,22 @@ function convert(raw: RawPiece): ImportCheck {
   if (!parts.length) return { ok: false, reason: "empty" };
   if (raw.notPiano) return { ok: false, reason: "notPiano" };
   if (parts.length > 2) return { ok: false, reason: "tooManyParts" };
-  const firstBar = raw.times[0]?.beats || 4;
+  const firstBar = meterOfTime(raw.times[0])?.bar ?? 4;
   const bad = parts.flatMap((p) => p.notes).filter((n) => !okNote(n));
   if (bad.length) {
     const bars = uniqSorted(bad.filter((n) => Number.isFinite(n.start) && n.start >= 0).map((n) => Math.floor(n.start / firstBar) + 1));
     return { ok: false, reason: "badNotes", detail: { count: bad.length, bars } };
   }
   const signatures = new Set(raw.times.map((t) => `${t.beats}/${t.beatType}`));
-  const first = raw.times[0];
-  if (signatures.size > 1 || (first && (first.beatType !== 4 || !BEATS.includes(first.beats)))) {
-    return { ok: false, reason: "timeSignature" };
-  }
-  const bar = first?.beats ?? 4;
+  const meter = meterOfTime(raw.times[0]);
+  if (signatures.size > 1 || !meter) return { ok: false, reason: "timeSignature" };
+  const { bar, pulse, six } = meter;
 
   // 2 · manos
   const marks: Marks = new Map();
-  let right: RawNote[] = [];
-  let left: RawNote[] | null = null;
-  if (parts.length === 2) {
-    const avg = (ns: RawNote[]) => ns.reduce((a, n) => a + n.pitch, 0) / ns.length;
-    const [a, b] = parts;
-    const aRight = a.staff && b.staff ? a.staff < b.staff : avg(a.notes) >= avg(b.notes);
-    [right, left] = aRight ? [a.notes, b.notes] : [b.notes, a.notes];
-  } else {
-    const only = parts[0];
-    if (only.staff === 2) {
-      left = only.notes;
-    } else if (hasSimultaneous(only.notes)) {
-      const hi = only.notes.filter((n) => n.pitch >= MIDDLE_C);
-      const lo = only.notes.filter((n) => n.pitch < MIDDLE_C);
-      if (lo.length) {
-        right = hi;
-        left = lo;
-        mark(marks, "handsSplit");
-      } else {
-        right = hi;
-      }
-    } else {
-      right = only.notes;
-    }
-  }
+  const hands = splitHands(parts);
+  if (hands.split) mark(marks, "handsSplit");
+  const { right, left } = hands;
 
   // 3–5 · rejilla, una nota por mano, duraciones
   const r = toHand(right, "R", bar, marks);
@@ -165,8 +171,8 @@ function convert(raw: RawPiece): ImportCheck {
   const eighths = [...r, ...(l ?? [])].filter((n) => n.d === 0.5).length / (r.length + (l?.length ?? 0));
   const song: Omit<SongDef, "id" | "level"> = {
     title: raw.title?.trim() || "Pieza importada",
-    tempo: clampTempo(raw.tempo),
-    ...(bar !== 4 ? { bar } : {}),
+    tempo: clampTempo(raw.tempo === undefined ? undefined : raw.tempo / pulse),
+    ...(six ? { time: "6/8" as const } : bar !== 4 ? { bar } : {}),
     px: eighths > 0.25 ? 60 : 50,
     ...(l ? { r: toTrack(r, total), l: toTrack(l, total) } : { n: toTrack(r, total) }),
   };

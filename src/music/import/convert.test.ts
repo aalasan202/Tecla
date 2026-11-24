@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { SONGS } from "../songs";
 import type { SongDef } from "../types";
 import { DURATIONS, convertPiece } from "./convert";
+import { needsFullNotation } from "../validate";
 import { DOS_CUARTOS, songToMidi } from "./fixtures";
 import { midiToRaw, parseMidi } from "./midi";
 import type { ImportCheck, Proposal, RawNote, RawPart, RawPiece } from "./types";
 
 const byId = (id: string) => SONGS.find((s) => s.id === id)!;
+/** Piezas que la versión simplificada representa tal cual (sin acordes, ligaduras ni 6/8). */
+const SIMPLE = SONGS.filter((s) => !needsFullNotation(s));
 const note = (pitch: number, start: number, dur: number): RawNote => ({ pitch, start, dur });
 const piece = (parts: RawPart[], extra: Partial<RawPiece> = {}): RawPiece => ({
   format: "midi",
@@ -44,7 +47,7 @@ function expectValid(song: Proposal["song"]) {
 }
 
 describe("ida y vuelta MIDI del repertorio (SC-002)", () => {
-  it.each(SONGS.map((s) => [s.id, s] as const))("%s", (_id, s) => {
+  it.each(SIMPLE.map((s) => [s.id, s] as const))("%s", (_id, s) => {
     const p = ok(viaMidi(s));
     expect(p.song.n).toEqual(s.n);
     expect(p.song.r).toEqual(s.r);
@@ -207,9 +210,12 @@ describe("rechazos (FR-003)", () => {
     expect(reason(convertPiece(piece([{ notes: [note(60, 0, 0)] }])))).toBe("badNotes");
     expect(reason(convertPiece(piece([{ notes: [note(60, 0, -1)] }])))).toBe("badNotes");
   });
-  it("compases que no son 4/4, 3/4 ni 2/4, o que cambian → timeSignature", () => {
+  it("compases que no son 4/4, 3/4, 2/4 ni 6/8, o que cambian → timeSignature", () => {
     const with_ = (times: RawPiece["times"]) => reason(convertPiece(piece([{ notes: melody }], { times })));
-    expect(with_([{ at: 0, beats: 6, beatType: 8 }])).toBe("timeSignature");
+    expect(with_([{ at: 0, beats: 9, beatType: 8 }])).toBe("timeSignature");
+    expect(with_([{ at: 0, beats: 5, beatType: 4 }])).toBe("timeSignature");
+    expect(with_([{ at: 0, beats: 6, beatType: 8 }, { at: 3, beats: 3, beatType: 4 }])).toBe("timeSignature");
+    expect(with_([{ at: 0, beats: 6, beatType: 8 }])).toBe("ok");
     expect(with_([{ at: 0, beats: 2, beatType: 2 }])).toBe("timeSignature");
     expect(with_([{ at: 0, beats: 4, beatType: 4 }, { at: 4, beats: 3, beatType: 4 }])).toBe("timeSignature");
     expect(with_([{ at: 0, beats: 4, beatType: 4 }, { at: 4, beats: 2, beatType: 4 }])).toBe("timeSignature");

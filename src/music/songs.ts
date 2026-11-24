@@ -1,7 +1,13 @@
-import type { RawTrack, SongDef } from "./types";
+import type { RawTrack, SongDef, Track } from "./types";
 
 /** Arpegio de tres notas en corcheas, subiendo y bajando dos veces (un compás de 4/4). */
 const arp = (a: number, b: number, c: number): RawTrack => [a, b, c, b, a, b, c, b].map((m) => [m, 0.5] as [number, number]);
+
+/** Tríadas de la mano izquierda en posición cerrada (Do mayor y Sol mayor en 1.ª inversión). */
+const DO: number[] = [48, 52, 55];
+const SOL: number[] = [47, 50, 55];
+/** Un compás de 4/4 con dos acordes de blanca. */
+const halves = (a: number[], b: number[]): Track => [[a, 2], [b, 2]];
 
 export const SONGS: SongDef[] = [
   {
@@ -33,7 +39,7 @@ export const SONGS: SongDef[] = [
       [60, 1], [60, 1], [60, 1], [62, 1], [64, 2], [62, 2], [60, 1], [64, 1], [62, 1], [62, 1], [60, 4]],
   },
   {
-    id: "minueto", title: "Minueto en Sol", level: "Nivel 3 · Petzold (atrib. Bach) · 3/4", tempo: 90, bar: 3, px: 64,
+    id: "minueto", title: "Minueto en Sol", level: "Nivel 3 · Petzold (atrib. Bach) · 3/4", tempo: 90, bar: 3, px: 64, key: 1,
     n: [[74, 1], [67, 0.5], [69, 0.5], [71, 0.5], [72, 0.5], [74, 1], [67, 1], [67, 1],
       [76, 1], [72, 0.5], [74, 0.5], [76, 0.5], [78, 0.5], [79, 1], [67, 1], [67, 1],
       [72, 1], [74, 0.5], [72, 0.5], [71, 0.5], [69, 0.5], [71, 1], [72, 0.5], [71, 0.5], [69, 0.5], [67, 0.5],
@@ -82,5 +88,50 @@ export const SONGS: SongDef[] = [
       [48, 2], [52, 2], [48, 2], [50, 2], [47, 2], [50, 2], [47, 2], [48, 2], [48, 4]],
   },
 ];
+
+/**
+ * Piezas que usan la partitura profesional (007): acordes, armadura, ligaduras, 6/8.
+ * Van aparte para que se vea qué exige cada una; la lista final las añade al repertorio.
+ */
+const PRO: SongDef[] = [
+  {
+    id: "oda-acordes", title: "Himno a la alegría con acordes", level: "Nivel 3 · Beethoven · Acordes", tempo: 76,
+    r: SONGS.find((s) => s.id === "oda")!.n!,
+    l: [...halves(DO, DO), ...halves(SOL, SOL), ...halves(DO, DO), ...halves(SOL, SOL),
+      ...halves(DO, DO), ...halves(SOL, SOL), ...halves(DO, DO), ...halves(SOL, DO)],
+  },
+  {
+    // Wiegenlied, op. 49 n.º 4: la anacrusa se completa con silencio; el bajo se mantiene ligado
+    // a través de la barra mientras no cambia la armonía
+    id: "cuna", title: "Canción de cuna", level: "Nivel 3 · Brahms · 3/4 · Ligaduras", tempo: 72, bar: 3, px: 60,
+    r: [[0, 2], [64, 0.5], [64, 0.5],
+      [67, 1.5, { slur: "start" }], [64, 0.5], [64, 1, { slur: "end" }], [67, 2], [64, 0.5], [67, 0.5],
+      [72, 1, { slur: "start" }], [71, 1.5], [69, 0.5, { slur: "end" }], [69, 1], [67, 1], [62, 0.5], [64, 0.5],
+      [65, 1], [62, 1], [62, 0.5], [64, 0.5], [65, 2], [62, 0.5], [65, 0.5],
+      [71, 0.5], [69, 0.5], [67, 1], [71, 1], [72, 3]],
+    l: [[0, 3],
+      [48, 3, { tie: true }], [48, 3],
+      [43, 3, { tie: true }], [43, 3],
+      [47, 3, { tie: true }], [47, 3],
+      [43, 3], [48, 3]],
+  },
+  {
+    // popular inglesa (s. XVI), en La menor; la anacrusa se completa con silencio.
+    // Tempo en negras con puntillo por minuto (dos pulsos por compás)
+    id: "greensleeves", title: "Greensleeves", level: "Nivel 4 · Popular inglesa · 6/8", tempo: 50, time: "6/8",
+    r: [[0, 2.5], [69, 0.5],
+      [72, 1], [74, 0.5], [76, 0.75], [77, 0.25], [76, 0.5],
+      [74, 1], [71, 0.5], [67, 0.75], [69, 0.25], [71, 0.5],
+      [72, 1], [69, 0.5], [69, 0.75], [68, 0.25], [69, 0.5],
+      [71, 1], [68, 0.5], [64, 1], [69, 0.5],
+      [72, 1], [74, 0.5], [76, 0.75], [77, 0.25], [76, 0.5],
+      [74, 1], [71, 0.5], [67, 0.75], [69, 0.25], [71, 0.5],
+      [72, 0.75], [71, 0.25], [69, 0.5], [68, 0.75], [66, 0.25], [68, 0.5],
+      [69, 3]],
+    l: [[0, 3], [45, 3], [43, 3], [45, 3], [40, 3], [45, 3], [43, 3], [45, 1.5], [40, 1.5], [45, 3]],
+  },
+];
+
+SONGS.push(...PRO);
 
 export const DEFAULT_SONG_ID = "oda2";

@@ -270,10 +270,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .board { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .staff-wrap { overflow-x: auto; scrollbar-width: thin; }
 .staff { display: block; }
-.staff-line { stroke: var(--staff); stroke-width: 1; }
-.glyph { fill: var(--ink); font-family: var(--music); }
-.glyph.rest { fill: var(--muted); }
-.tsig { font: 700 21px var(--display); fill: var(--ink); }
 .rowh { font: 600 11px var(--body); letter-spacing: 0.04em; }
 .rowh-r { fill: var(--accent); }
 .rowh-l { fill: var(--left); }
@@ -286,17 +282,24 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .n.L.now { color: var(--left); }
 .n.hit { color: var(--good); }
 .n.miss { color: var(--bad); }
-.n .head { fill: currentColor; stroke: currentColor; stroke-width: 1; }
-.n .head.hollow { fill: var(--surface); stroke-width: 2; }
-.n .stem { stroke: currentColor; stroke-width: 1.6; }
-.n .flag { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.n .dot-fill, .n .acc { fill: currentColor; }
-.n .acc { font-family: var(--music); }
 .n .lbl { fill: var(--muted); font: 500 12px var(--body); }
 .n.now .lbl { fill: currentColor; font-weight: 600; }
 .n .fg { font: 700 12px var(--body); fill: var(--accent); }
 .n.L .fg { fill: var(--left); }
 .n.auto .fg { opacity: 0.4; }
+/* partitura dibujada con VexFlow (ScoreView): colores del tema sobre los atributos de VexFlow */
+.score-loading { display: grid; place-items: center; min-height: 150px; color: var(--muted); font-size: 15px; }
+.vfl { color: var(--ink); }
+.vfl [fill]:not([fill="none"]) { fill: currentColor; }
+.vfl [stroke]:not([stroke="none"]) { stroke: currentColor; }
+.vfl .vf-stave, .vfl .vf-stavebarline, .vfl .vf-staveconnector { color: var(--staff); }
+.vfl .vf-clef, .vfl .vf-keysignature, .vfl .vf-timesignature { color: var(--ink); }
+.vfl .vf-stavenote, .vfl .vf-notehead { transition: color 0.15s; }
+.vfl .mk-auto { color: var(--faint); }
+.vfl .mk-now { color: var(--accent); }
+.vfl .mk-L.mk-now { color: var(--left); }
+.vfl .mk-hit { color: var(--good); }
+.vfl .mk-miss { color: var(--bad); }
 .statusbar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .statusbar strong { color: var(--ink); font-weight: 600; }
 .controls { display: flex; gap: 12px 20px; align-items: center; flex-wrap: wrap; }

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addImported, editImported, findByHash, imported, removeImported, type ImportMeta } from "./imported";
+import { addImported, editImported, ensureFull, findByHash, imported, removeImported, setVersion, type ImportMeta } from "./imported";
+import { allSongs, findSong, repertoireStars, resolveSongId } from "./library";
 import { progress, recordStars } from "./progress";
-import type { Proposal } from "../music/import/types";
+import type { FullCheck, Proposal, RawPiece } from "../music/import/types";
 
 const proposal: Proposal = {
   song: { title: "Original", tempo: 90, px: 50, n: [[60, 4]] },
@@ -126,5 +127,82 @@ describe("removeImported", () => {
     expect(imported.get().songs).toEqual([]);
     expect(deps.deleteOriginal).toHaveBeenCalledWith("imp-0123abcd");
     expect(progress.get().best).toEqual({ oda: 1 });
+  });
+});
+
+describe("versión completa (007, historia 5)", () => {
+  const full: FullCheck = { ok: true, song: { title: "Original", tempo: 90, n: [[[60, 64, 67], 4]] }, level: 4, warnings: [] };
+  const rawPiece: RawPiece = { format: "midi", times: [], parts: [{ notes: [{ pitch: 60, start: 0, dur: 4 }, { pitch: 64, start: 0, dur: 4 }] }], notPiano: false, ignored: { grace: 0, cue: 0 } };
+  const fullDeps = (bytes?: Uint8Array) => ({ getOriginal: vi.fn(async () => bytes), readRaw: vi.fn(async () => rawPiece) });
+
+  it("al importar guarda las dos versiones y la elegida, cada una con su nivel", async () => {
+    await addImported(proposal, meta, bytes, { title: "Mía", level: 3, full, version: "full" }, fakeDeps());
+    const [song] = imported.get().songs;
+    expect(song.version).toBe("full");
+    expect(song.def.level).toBe("Nivel 1 · Importada de MIDI");
+    expect(song.full).toMatchObject({ def: { id: "imp-0123abcd.full", title: "Mía", level: "Nivel 3 · Importada de MIDI" }, level: 4 });
+    expect(allSongs().at(-1)!.id).toBe("imp-0123abcd.full");
+  });
+
+  it("si la completa no está disponible se guarda el motivo y queda la simplificada", async () => {
+    await addImported(proposal, meta, bytes, { title: "Mía", level: 2, full: { ok: false, reason: "voices" }, version: "full" }, fakeDeps());
+    const [song] = imported.get().songs;
+    expect(song.version).toBeUndefined();
+    expect(song.full).toEqual({ unavailable: "voices" });
+    expect(setVersion("imp-0123abcd", "full")).toBe(false);
+  });
+
+  it("una importada de 006 sigue en la simplificada; ensureFull la calcula desde el original", async () => {
+    await addImported(proposal, meta, bytes, { title: "Vieja", level: 1 }, fakeDeps());
+    expect(imported.get().songs[0].full).toBeUndefined();
+    expect(resolveSongId("imp-0123abcd")).toBe("imp-0123abcd");
+    const deps = fullDeps(bytes);
+    expect(await ensureFull("imp-0123abcd", deps)).toBe("ok");
+    expect(deps.readRaw).toHaveBeenCalledWith(bytes, "pieza.mid");
+    expect(imported.get().songs[0].full).toMatchObject({ def: { id: "imp-0123abcd.full", n: [[[60, 64], 4]] } });
+    // ya calculada: no vuelve a leer el original
+    expect(await ensureFull("imp-0123abcd", deps)).toBe("ok");
+    expect(deps.getOriginal).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin original no guarda nada y se puede reintentar", async () => {
+    await addImported(proposal, meta, bytes, { title: "Vieja", level: 1 }, fakeDeps());
+    expect(await ensureFull("imp-0123abcd", fullDeps(undefined))).toBe("unreadable");
+    expect(imported.get().songs[0].full).toBeUndefined();
+  });
+
+  it("cambiar de versión conserva las estrellas de cada una (SC-008)", async () => {
+    await addImported(proposal, meta, bytes, { title: "Mía", level: 1, full }, fakeDeps());
+    recordStars("imp-0123abcd", 2);
+    expect(setVersion("imp-0123abcd", "full")).toBe(true);
+    expect(resolveSongId("imp-0123abcd")).toBe("imp-0123abcd.full");
+    expect(progress.get().best["imp-0123abcd.full"] ?? 0).toBe(0);
+    recordStars("imp-0123abcd.full", 3);
+    expect(setVersion("imp-0123abcd.full", "simple")).toBe(true);
+    expect(resolveSongId("imp-0123abcd.full")).toBe("imp-0123abcd");
+    expect(progress.get().best).toMatchObject({ "imp-0123abcd": 2, "imp-0123abcd.full": 3 });
+    expect(findSong("imp-0123abcd.full")?.n).toEqual([[[60, 64, 67], 4]]);
+    expect(repertoireStars(progress.get().best)).toBe(0);
+  });
+
+  it("editar cambia el título de las dos y el nivel solo de la versión editada", async () => {
+    await addImported(proposal, meta, bytes, { title: "Mía", level: 1, full }, fakeDeps());
+    expect(editImported("imp-0123abcd.full", { title: "Nueva", level: 2 })).toBe(true);
+    const [song] = imported.get().songs;
+    expect(song.def).toMatchObject({ title: "Nueva", level: "Nivel 1 · Importada de MIDI" });
+    expect(song.full).toMatchObject({ def: { title: "Nueva", level: "Nivel 2 · Importada de MIDI" } });
+  });
+
+  it("borrar quita las estrellas de las dos versiones y «Continuar» si apuntaba a la completa", async () => {
+    const deps = fakeDeps();
+    await addImported(proposal, meta, bytes, { title: "Mía", level: 1, full }, deps);
+    recordStars("imp-0123abcd", 1);
+    recordStars("imp-0123abcd.full", 3);
+    progress.set((p) => ({ ...p, last: { songId: "imp-0123abcd.full", mode: "play", hands: "both", progress: 0.5, at: 1 } }));
+    await removeImported("imp-0123abcd.full", deps);
+    expect(imported.get().songs).toEqual([]);
+    expect(progress.get().best).toEqual({});
+    expect(progress.get().last).toBeNull();
+    expect(deps.deleteOriginal).toHaveBeenCalledWith("imp-0123abcd");
   });
 });

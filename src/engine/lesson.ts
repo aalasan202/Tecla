@@ -1,6 +1,8 @@
-import type { Hand, Score, ScoreNote } from "../music/types";
-import { noteName } from "../music/theory";
-import { STAFF_LEFT } from "../music/score";
+import type { Hand, Score, ScoreNote, Spelled } from "../music/types";
+import { noteLabel } from "../music/spelling";
+import { HIT_WINDOW, PERFECT_WINDOW } from "../music/score";
+
+export { HIT_WINDOW, PERFECT_WINDOW };
 
 export type Mode = "listen" | "learn" | "play";
 export type HandChoice = "both" | Hand;
@@ -29,8 +31,8 @@ export interface LessonHost {
   now(): number;
   frame(cb: () => void): number;
   cancelFrame(id: number): void;
-  /** Nombre de una nota en la notación elegida (Do o C). */
-  name?(m: number): string;
+  /** Nombre de una nota en la notación elegida (Do o C), con su ortografía si se conoce. */
+  name?(m: number, spell?: Spelled): string;
 }
 
 /** Fragmento que se repite en bucle: compases de inicio y fin, base 0, inclusivos. */
@@ -54,11 +56,8 @@ export interface LessonOptions {
   loop?: LoopRange;
 }
 
-/** Pulsos de cuenta atrás antes de Tocar. */
+/** Pulsos de metrónomo de cuenta atrás antes de Tocar. */
 export const COUNT_IN = 4;
-/** Ventana (en pulsos) para aceptar una nota en Tocar, y para considerarla "perfecta". */
-export const HIT_WINDOW = 0.45;
-export const PERFECT_WINDOW = 0.18;
 /** Con bucle en Tocar, la repetición se cierra este margen (en pulsos) tras el final del fragmento. */
 const LOOP_CLOSE = HIT_WINDOW + 0.15;
 
@@ -118,9 +117,9 @@ export class Lesson {
     this.reset();
   }
 
-  /** Segundos por pulso. */
+  /** Segundos por negra: el tempo va en pulsos por minuto (negras con puntillo en 6/8). */
   get spb(): number {
-    return 60 / this.tempo;
+    return 60 / (this.tempo * this.score.pulse);
   }
 
   isAuto(n: ScoreNote): boolean {
@@ -235,13 +234,13 @@ export class Lesson {
     for (const n of this.active()) {
       if (this.rt[n.id].judged || n.m !== m) continue;
       const d = Math.abs(n.s - beat);
-      if (d <= HIT_WINDOW && d < bestDist) {
+      if (d <= n.win.hit && d < bestDist) {
         bestDist = d;
         best = n;
       }
     }
     if (best) {
-      this.rt[best.id].judged = bestDist <= PERFECT_WINDOW ? "perfect" : "good";
+      this.rt[best.id].judged = bestDist <= best.win.perfect ? "perfect" : "good";
       this.host.mark(best.id, "hit");
       this.host.flash(m, "ok");
     } else {
@@ -251,7 +250,7 @@ export class Lesson {
   }
 
   private beat(): number {
-    return (this.host.now() - this.t0) / 1000 / this.spb - (this.mode === "play" ? COUNT_IN : 0);
+    return (this.host.now() - this.t0) / 1000 / this.spb - (this.mode === "play" ? COUNT_IN * this.score.pulse : 0);
   }
 
   /** Bucle en Escuchar/Tocar: período en pulsos (en Tocar, con un compás de descanso). */
@@ -378,7 +377,7 @@ export class Lesson {
     this.pos = Math.min(this.pos + Math.max(0, now - this.lastFrame) / 1000 / this.spb, pending);
     this.lastFrame = now;
     if (this.loop && this.gi >= this.groups.length && this.pos >= this.end) this.nextRepetition();
-    const x = STAFF_LEFT + this.pos * score.px + 16;
+    const x = score.layout.xAt(this.pos);
     this.host.playhead(x);
     this.host.scrollTo(x, false);
 
@@ -402,8 +401,8 @@ export class Lesson {
   };
 
   label(group: ScoreNote[]): string {
-    const name = (m: number) => this.host.name?.(m) ?? noteName(m);
-    return group.map((n) => name(n.m) + (this.score.twoHands ? (n.h === "L" ? " (MI)" : " (MD)") : "")).join(" + ");
+    const name = (n: ScoreNote) => this.host.name?.(n.m, n.spell) ?? noteLabel(n.spell);
+    return group.map((n) => name(n) + (this.score.twoHands ? (n.h === "L" ? " (MI)" : " (MD)") : "")).join(" + ");
   }
 
   /** Bucle de fotogramas de Escuchar y Tocar. */
@@ -426,19 +425,18 @@ export class Lesson {
           w = this.where();
         }
         resting = mode === "play" && w.local >= len;
-        restLeft = Math.ceil(this.period - w.local);
+        restLeft = Math.ceil((this.period - w.local) / score.pulse);
       }
       g = w.g;
       beat = w.b;
       cursor = w.g < 0 || resting ? this.start0 : w.b;
-      strong = w.k < 0 ? (((Math.floor(g) % score.bar) + score.bar) % score.bar) === 0 : Math.floor(w.local) % score.bar === 0;
+      strong = w.k < 0 ? isStrong(Math.floor(g / score.pulse), score) : isStrong(Math.floor(w.local / score.pulse + 1e-9), score);
     } else {
       g = beat = cursor = this.beat();
-      const bi = Math.floor(beat);
-      strong = ((bi % score.bar) + score.bar) % score.bar === 0;
+      strong = isStrong(Math.floor(beat / score.pulse), score);
     }
     this.lastBeat = Math.max(this.lastBeat, beat);
-    const x = STAFF_LEFT + cursor * score.px + 16;
+    const x = score.layout.xAt(cursor);
     this.host.playhead(x);
     this.host.scrollTo(x, false);
 
@@ -455,15 +453,16 @@ export class Lesson {
     }
 
     if (mode === "play") {
-      const bi = Math.floor(g);
-      if (bi > this.lastTick && (this.loop || bi < score.total)) {
+      // un clic por pulso del metrónomo (negra, o negra con puntillo en 6/8)
+      const bi = Math.floor(g / score.pulse + 1e-9);
+      if (bi > this.lastTick && (this.loop || bi * score.pulse < score.total)) {
         this.lastTick = bi;
         this.host.click(strong);
       }
       const act = this.active();
       for (const n of act) {
         const r = this.rt[n.id];
-        if (!r.judged && beat > n.s + HIT_WINDOW) {
+        if (!r.judged && beat > n.s + n.win.hit) {
           r.judged = "miss";
           this.host.mark(n.id, "miss");
         }
@@ -475,7 +474,7 @@ export class Lesson {
       const hits = act.filter((n) => this.rt[n.id].judged && this.rt[n.id].judged !== "miss").length;
       const text =
         g < 0
-          ? `Preparados… ${-Math.floor(g)}`
+          ? `Preparados… ${-Math.floor(g / score.pulse)}`
           : resting
             ? `Otra vez… ${restLeft}`
             : `${this.repPrefix()}Aciertos ${hits} de ${act.length}`;
@@ -511,12 +510,23 @@ export class Lesson {
     if (this.mode === "listen") {
       return { mode: "listen", score: null, stars: 0, message: "Ya conoces cómo suena. Ahora apréndela nota a nota." };
     }
-    const act = this.active();
-    const n = act.length || 1;
+    // cada evento (nota suelta o acorde) cuenta una vez (research R6)
+    const units = new Map<number, ScoreNote[]>();
+    for (const x of this.active()) {
+      const list = units.get(x.unit);
+      if (list) list.push(x);
+      else units.set(x.unit, [x]);
+    }
+    const n = units.size || 1;
     let pct: number;
     if (this.mode === "learn") pct = n / (n + this.mistakes);
     else {
-      const points = act.reduce((a, x) => a + (this.rt[x.id].judged === "perfect" ? 1 : this.rt[x.id].judged === "good" ? 0.7 : 0), 0);
+      let points = 0;
+      for (const notes of units.values()) {
+        const judged = notes.map((x) => this.rt[x.id].judged);
+        if (judged.every((j) => j === "perfect")) points += 1;
+        else if (judged.every((j) => j === "perfect" || j === "good")) points += 0.7;
+      }
       pct = Math.max(0, (points - this.extra * 0.25) / n);
     }
     const stars = starsFor(pct);
@@ -530,6 +540,12 @@ export class Lesson {
     else if (this.mode === "learn" && stars >= 2) message += " Ya puedes pasar a Tocar.";
     return { mode: this.mode, score: pct, stars, message };
   }
+}
+
+/** El pulso `bi` (base 0, en pulsos de metrónomo) abre un compás. */
+function isStrong(bi: number, score: Score): boolean {
+  const perBar = Math.round(score.bar / score.pulse);
+  return ((bi % perBar) + perBar) % perBar === 0;
 }
 
 export const starsFor = (pct: number): number => (pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0);

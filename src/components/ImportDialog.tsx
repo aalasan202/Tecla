@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { checkFile, type FileCheck } from "../import/check";
-import type { ImportedSong, Level, Proposal, RejectDetail, RejectReason, Warning, WarningKind } from "../music/import/types";
+import type { FullCheck, FullReason, ImportedSong, Level, Proposal, RejectDetail, RejectReason, SongVersion, Warning, WarningKind } from "../music/import/types";
+import { measure } from "../music/import/level";
+import type { SongDef } from "../music/types";
 import { addImported, findByHash } from "../state/imported";
 import { Dialog } from "./Dialog";
 
@@ -35,7 +37,7 @@ const REJECT: Record<RejectReason, (d?: RejectDetail) => string> = {
     const where = d?.bars?.length ? ` (${barsText(d.bars)})` : "";
     return `${n === 1 ? "1 nota no se puede leer" : `${n} notas no se pueden leer`}${where}.`;
   },
-  timeSignature: () => "Solo se admiten compases de 4/4, 3/4 y 2/4.",
+  timeSignature: () => "Solo se admiten compases de 4/4, 3/4, 2/4 y 6/8.",
 };
 
 const WARNING: Record<WarningKind, string> = {
@@ -53,6 +55,23 @@ const warningText = (w: Warning) => {
   if (base.endsWith(".")) return base;
   return w.bars.length ? `${base} (${barsText(w.bars)}).` : `${base}.`;
 };
+
+/** Por qué no hay versión completa (FR-019c). */
+export const FULL_REASON: Record<FullReason, string> = {
+  voices: "hay varias voces en una misma mano",
+  timeSignature: "el compás no es 2/4, 3/4, 4/4 ni 6/8",
+  timeChange: "la pieza cambia de compás",
+  unreadable: "no se ha podido convertir el original",
+};
+
+/** Las dos versiones darían lo mismo: no hay nada que simplificar. */
+function sameVersions(simple: Proposal["song"], full: Proposal["song"]): boolean {
+  const notes = (s: Proposal["song"]) => JSON.stringify([s.n, s.r, s.l, s.bar, s.time]);
+  return !full.key && !full.keyChanges?.length && notes(simple) === notes(full);
+}
+
+/** «4/4», «3/4», «6/8». */
+export const timeText = (song: Pick<SongDef, "bar" | "time">) => song.time ?? `${song.bar ?? 4}/4`;
 
 const HEAVY_TEXT = "Esta pieza es muy larga o tiene muchas notas: puede ir lenta en este dispositivo.";
 const NO_SPACE = "No queda espacio en este dispositivo. Borra alguna pieza importada.";
@@ -157,10 +176,10 @@ export function ImportDialog({ file, onClose, onAdded }: Props) {
           fileName={file.name}
           saving={state.step === "saving"}
           onCancel={onClose}
-          onSave={async (title, level) => {
+          onSave={async (title, level, version) => {
             setState({ step: "saving", check: state.check });
-            const { proposal, hash, format, bytes } = state.check;
-            const res = await addImported(proposal, { format, fileName: file.name, size: file.size, hash }, bytes, { title, level });
+            const { proposal, hash, format, bytes, full } = state.check;
+            const res = await addImported(proposal, { format, fileName: file.name, size: file.size, hash }, bytes, { title, level, full, version });
             if (res.ok) onAdded(res.id);
             else setState({ step: "noSpace" });
           }}
@@ -189,14 +208,35 @@ interface SummaryProps {
   fileName: string;
   saving: boolean;
   onCancel(): void;
-  onSave(title: string, level: Level): void;
+  onSave(title: string, level: Level, version: SongVersion): void;
+}
+
+/** Lo que el resumen enseña de una versión: definición, nivel sugerido, avisos y medidas. */
+interface Shown {
+  song: Proposal["song"];
+  level: Level;
+  warnings: Warning[];
+  metrics: Proposal["metrics"];
+  heavy: boolean;
 }
 
 function Summary({ check, fileName, saving, onCancel, onSave }: SummaryProps) {
   const { proposal } = check;
+  const full: Extract<FullCheck, { ok: true }> | null = check.full?.ok ? check.full : null;
+  // las dos versiones solo se ofrecen si difieren; la completa, marcada por defecto (FR-019a)
+  const both = !!full && !sameVersions(proposal.song, full.song);
+  const [version, setVersion] = useState<SongVersion>(both ? "full" : "simple");
+  const shown: Shown =
+    version === "full" && full
+      ? { song: full.song, level: full.level, warnings: full.warnings, metrics: measure(full.song), heavy: proposal.heavy }
+      : proposal;
   const [title, setTitle] = useState(proposal.song.title);
-  const [level, setLevel] = useState<Level>(proposal.level);
+  const [level, setLevel] = useState<Level>(shown.level);
   const valid = title.trim().length > 0;
+  const choose = (v: SongVersion) => {
+    setVersion(v);
+    setLevel(v === "full" && full ? full.level : proposal.level);
+  };
 
   return (
     <Dialog
@@ -208,7 +248,7 @@ function Summary({ check, fileName, saving, onCancel, onSave }: SummaryProps) {
             Cancelar
           </button>
           <button type="submit" form="import-form" className="btn primary" disabled={saving || !valid}>
-            {saving ? "Añadiendo…" : proposal.heavy ? "Añadir igualmente" : "Añadir"}
+            {saving ? "Añadiendo…" : shown.heavy ? "Añadir igualmente" : "Añadir"}
           </button>
         </>
       }
@@ -218,25 +258,43 @@ function Summary({ check, fileName, saving, onCancel, onSave }: SummaryProps) {
         className="dialog-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (valid && !saving) onSave(title.trim(), level);
+          if (valid && !saving) onSave(title.trim(), level, version);
         }}
       >
-        {proposal.heavy && (
+        {shown.heavy && (
           <p className="dialog-warn" role="note">
             {HEAVY_TEXT}
+          </p>
+        )}
+        {both && (
+          <fieldset className="dialog-levels" disabled={saving}>
+            <legend>Versión</legend>
+            <div className="seg">
+              <button type="button" aria-pressed={version === "full"} onClick={() => choose("full")}>
+                Versión completa
+              </button>
+              <button type="button" aria-pressed={version === "simple"} onClick={() => choose("simple")}>
+                Versión simplificada
+              </button>
+            </div>
+          </fieldset>
+        )}
+        {check.full && !check.full.ok && proposal.warnings.length > 0 && (
+          <p className="muted" role="note">
+            Solo se puede añadir la versión simplificada: {FULL_REASON[check.full.reason]}.
           </p>
         )}
         <label className="dialog-field">
           <span>Título</span>
           <input type="text" value={title} maxLength={80} required onChange={(e) => setTitle(e.target.value)} disabled={saving} />
         </label>
-        <LevelPicker value={level} suggested={proposal.level} onChange={setLevel} disabled={saving} />
-        <Facts proposal={proposal} />
-        {proposal.warnings.length > 0 && (
+        <LevelPicker value={level} suggested={shown.level} onChange={setLevel} disabled={saving} />
+        <Facts shown={shown} />
+        {shown.warnings.length > 0 && (
           <div className="dialog-notes">
             <h3>Ajustes al convertir</h3>
             <ul>
-              {proposal.warnings.map((w) => (
+              {shown.warnings.map((w) => (
                 <li key={w.kind}>{warningText(w)}</li>
               ))}
             </ul>
@@ -248,12 +306,12 @@ function Summary({ check, fileName, saving, onCancel, onSave }: SummaryProps) {
   );
 }
 
-function Facts({ proposal }: { proposal: Proposal }) {
-  const { song, metrics } = proposal;
+function Facts({ shown }: { shown: Shown }) {
+  const { song, metrics } = shown;
   const rows: [string, string][] = [
     ["Manos", metrics.twoHands ? "Dos manos" : "Una mano"],
-    ["Compás", `${song.bar ?? 4}/4`],
-    ["Tempo", `${song.tempo} ppm`],
+    ["Compás", timeText(song)],
+    ["Tempo", song.time === "6/8" ? `${song.tempo} ♩. por minuto` : `${song.tempo} ppm`],
     ["Compases", String(metrics.bars)],
     ["Notas", String(metrics.notes)],
   ];

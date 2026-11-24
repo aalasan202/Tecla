@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import { SONGS } from "../music/songs";
 import { convertPiece } from "../music/import/convert";
 import { ImportError } from "../music/import/errors";
-import { DOS_CUARTOS, songToMusicXml } from "../music/import/fixtures";
+import { DOS_CUARTOS, PRUEBA_COMPLETA, songToMusicXml, twoVoicesXml } from "../music/import/fixtures";
+import { convertFull } from "../music/import/full";
+import { buildScore } from "../music/score";
+import type { SongDef } from "../music/types";
 import { parseMusicXml } from "./musicxml";
+import { needsFullNotation } from "../music/validate";
 
 const reason = (f: () => unknown) => {
   try {
@@ -28,7 +32,7 @@ const n = (step: string, octave: number, dur: number, extra = "") =>
 const attrs = (beats = 4, divisions = 1) => `<attributes><divisions>${divisions}</divisions><time><beats>${beats}</beats><beat-type>4</beat-type></time></attributes>`;
 
 describe("ida y vuelta MusicXML del repertorio (SC-002)", () => {
-  it.each(SONGS.map((s) => [s.id, s] as const))("%s", (_id, s) => {
+  it.each(SONGS.filter((s) => !needsFullNotation(s)).map((s) => [s.id, s] as const))("%s", (_id, s) => {
     const raw = parseMusicXml(songToMusicXml(s), `${s.id}.musicxml`);
     expect(raw.title).toBe(s.title);
     const c = convertPiece(raw);
@@ -146,9 +150,52 @@ describe("MusicXML no válidos", () => {
     expect(raw.notPiano).toBe(true);
   });
 
-  it("compás de 6/8 → la conversión lo rechaza", () => {
-    const xml = score(`<measure number="1"><attributes><divisions>2</divisions><time><beats>6</beats><beat-type>8</beat-type></time></attributes>${n("C", 4, 6)}</measure>`);
+  it("compás de 9/8 → la conversión lo rechaza", () => {
+    const xml = score(`<measure number="1"><attributes><divisions>2</divisions><time><beats>9</beats><beat-type>8</beat-type></time></attributes>${n("C", 4, 9)}</measure>`);
     const c = convertPiece(parseMusicXml(xml, "a.xml"));
     expect(c.ok ? "ok" : c.reason).toBe("timeSignature");
+  });
+
+  it("compás de 6/8 → la versión simplificada lo admite (FR-020)", () => {
+    const xml = score(`<measure number="1"><attributes><divisions>2</divisions><time><beats>6</beats><beat-type>8</beat-type></time></attributes>${n("C", 4, 3)}${n("E", 4, 3)}</measure>`);
+    const c = convertPiece(parseMusicXml(xml, "a.xml"));
+    if (!c.ok) throw new Error(c.reason);
+    expect(c.proposal.song.time).toBe("6/8");
+    expect(c.proposal.song.n).toEqual([[60, 1.5], [64, 1.5]]);
+  });
+});
+
+describe("versión completa desde MusicXML (007)", () => {
+  it("lee armadura, acordes, tresillo y nota ligada", () => {
+    const raw = parseMusicXml(songToMusicXml(PRUEBA_COMPLETA), "p.musicxml");
+    expect(raw.keys).toEqual([{ at: 0, key: 1 }]);
+    const c = convertFull(raw);
+    if (!c.ok) throw new Error(c.reason);
+    const asSong = { ...c.song, id: "x", level: "" };
+    const played = (s: typeof asSong) => buildScore(s).notes.map(({ m, s: at, d, h }) => [m, at, d, h]);
+    expect(played(asSong)).toEqual(played(PRUEBA_COMPLETA));
+  });
+
+  it("guarda la alteración escrita: Si♭ en Fa mayor", () => {
+    const raw = parseMusicXml(songToMusicXml({ ...PRUEBA_COMPLETA, key: -1, r: undefined, l: undefined, n: [[70, 2], [61, 2]] }), "f.musicxml");
+    expect(raw.parts[0].notes.map((n) => n.spell)).toEqual(["b", "b"]);
+    expect(raw.keys).toEqual([{ at: 0, key: -1 }]);
+  });
+
+  it("dos voces en un pentagrama → versión completa no disponible, simplificada sí", () => {
+    const raw = parseMusicXml(twoVoicesXml(), "v.musicxml");
+    expect(convertFull(raw)).toEqual({ ok: false, reason: "voices" });
+    expect(convertPiece(raw).ok).toBe(true);
+  });
+
+  it("ida y vuelta de las piezas nuevas del repertorio", () => {
+    for (const id of ["oda-acordes", "cuna", "greensleeves", "minueto"]) {
+      const s = SONGS.find((x) => x.id === id)!;
+      const c = convertFull(parseMusicXml(songToMusicXml(s), `${id}.musicxml`));
+      if (!c.ok) throw new Error(`${id}: ${c.reason}`);
+      const played = (x: SongDef) => buildScore(x).notes.map(({ m, s: at, d, h }) => [m, at, d, h]);
+      expect(played({ ...c.song, id: "x", level: "" })).toEqual(played(s));
+      expect(c.song.time).toBe(s.time);
+    }
   });
 });

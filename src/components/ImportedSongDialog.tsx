@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { Level } from "../music/import/types";
+import type { FullReason, Level, SongVersion } from "../music/import/types";
 import type { SongDef } from "../music/types";
-import { editImported, removeImported } from "../state/imported";
+import { baseId, chosenDef, editImported, ensureFull, imported, removeImported, setVersion } from "../state/imported";
 import { Dialog } from "./Dialog";
-import { LevelPicker } from "./ImportDialog";
+import { FULL_REASON, LevelPicker } from "./ImportDialog";
 
 const levelNumber = (s: SongDef) => Number(/Nivel (\d)/.exec(s.level)?.[1] ?? 1) as Level;
 
@@ -12,9 +12,30 @@ interface Props {
   onClose(): void;
 }
 
-/** Opciones de una pieza importada: editar título y nivel, o borrarla con sus estrellas (FR-014). */
+/**
+ * Opciones de una pieza importada: elegir versión simplificada o completa (FR-019), editar
+ * título y nivel, o borrarla con sus estrellas (FR-014).
+ */
 export function ImportedSongDialog({ song, onClose }: Props) {
   const [step, setStep] = useState<"menu" | "edit" | "remove">("menu");
+  const { songs } = imported.use();
+  const record = songs.find((s) => s.def.id === baseId(song.id));
+  const active: SongVersion = record?.version === "full" ? "full" : "simple";
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<FullReason | null>(null);
+  const unavailable = failed ?? (record?.full && "unavailable" in record.full ? record.full.unavailable : null);
+
+  const choose = async (v: SongVersion) => {
+    if (v === active || !record) return;
+    if (v === "full" && !record.full) {
+      // piezas importadas antes de 007: la completa se calcula ahora desde el original
+      setBusy(true);
+      const res = await ensureFull(record.def.id);
+      setBusy(false);
+      if (res !== "ok") return setFailed(res);
+    }
+    setVersion(record.def.id, v);
+  };
 
   if (step === "menu")
     return (
@@ -27,6 +48,27 @@ export function ImportedSongDialog({ song, onClose }: Props) {
           </button>
         }
       >
+        <fieldset className="dialog-levels" disabled={busy}>
+          <legend>Versión</legend>
+          <div className="seg">
+            <button type="button" aria-pressed={active === "full"} disabled={!!unavailable} onClick={() => void choose("full")}>
+              Versión completa
+            </button>
+            <button type="button" aria-pressed={active === "simple"} onClick={() => void choose("simple")}>
+              Versión simplificada
+            </button>
+          </div>
+          {busy && (
+            <p className="muted" role="status">
+              Preparando la versión completa…
+            </p>
+          )}
+          {unavailable && (
+            <p className="muted" role="note">
+              La versión completa no está disponible: {FULL_REASON[unavailable]}.
+            </p>
+          )}
+        </fieldset>
         <div className="dialog-menu">
           <button type="button" className="btn" onClick={() => setStep("edit")}>
             Editar título y nivel
@@ -38,7 +80,8 @@ export function ImportedSongDialog({ song, onClose }: Props) {
       </Dialog>
     );
 
-  if (step === "edit") return <Edit song={song} onClose={onClose} />;
+  // se edita la versión elegida en este momento (el nivel es de cada versión)
+  if (step === "edit") return <Edit song={record ? chosenDef(record) : song} onClose={onClose} />;
 
   return (
     <Dialog

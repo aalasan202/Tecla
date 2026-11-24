@@ -1,56 +1,156 @@
-import type { Hand, RawTrack, Rest, Score, ScoreNote, SongDef } from "./types";
-import { assignFingering } from "./fingering";
+import type { EventOpts, Hand, KeyChange, Rest, Score, ScoreNote, SongDef, Spell, Track } from "./types";
+import { assignFingering, eventsOf } from "./fingering";
+import { layoutScore } from "./layout";
+import { accidentals, keyAt, spell } from "./spelling";
 
-/** Margen izquierdo de la partitura (clave y compás). */
-export const STAFF_LEFT = 74;
-const NOTE_OFFSET = 16;
+/** Ticks por negra: divisible por 2, 3, 4, 8, 12 y 16 (research R3). */
+export const TICKS = 48;
+/** Ventana (en pulsos) para aceptar una nota en Tocar, y para considerarla «perfecta». */
+export const HIT_WINDOW = 0.45;
+export const PERFECT_WINDOW = 0.18;
 
-/** Convierte la definición de una canción en notas posicionadas, silencios y digitación. */
-export function buildScore(song: SongDef): Score {
+/** Duración en pulsos → ticks enteros; lanza si no cae en un tick o no es positiva. */
+export function toTicks(d: number): number {
+  const t = Math.round(d * TICKS);
+  if (!(d > 0) || t <= 0 || Math.abs(t - d * TICKS) > 1e-6) throw new Error(`Duración no válida: ${d} (debe ser múltiplo de 1/48 de negra)`);
+  return t;
+}
+
+/** Compás, pulso del metrónomo y cifra de compás de una pieza. */
+export function meterOf(song: SongDef): { bar: number; pulse: number; time: Score["time"] } {
+  if (song.time === "6/8") return { bar: 3, pulse: 1.5, time: { beats: 6, unit: 8 } };
   const bar = song.bar ?? 4;
-  const px = song.px ?? 50;
-  const twoHands = !!song.l;
-  const tracks: [Hand, RawTrack][] = twoHands ? [["R", song.r ?? []], ["L", song.l ?? []]] : [["R", song.n ?? []]];
-  const notes: Omit<ScoreNote, "id">[] = [];
-  const rests: Rest[] = [];
-  let length = 0;
+  return { bar, pulse: 1, time: { beats: bar, unit: 4 } };
+}
 
-  for (const [h, track] of tracks) {
+/** Armaduras por compás, ordenadas y con la del compás 0. */
+export function keysOf(song: SongDef): KeyChange[] {
+  const map = new Map<number, number>([[0, song.key ?? 0]]);
+  for (const c of song.keyChanges ?? []) map.set(c.at, c.key);
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([at, key]) => ({ at, key }));
+}
+
+export const tracksOf = (song: SongDef): [Hand, Track][] =>
+  song.l ? [["R", song.r ?? []], ["L", song.l]] : [["R", song.n ?? []]];
+
+/** Alturas de un evento (vacío si es silencio), con su ortografía forzada. */
+export function pitchesOf(nota: number | number[], opts?: EventOpts): { m: number; spell?: Spell }[] {
+  const list = Array.isArray(nota) ? nota : nota === 0 ? [] : [nota];
+  const spells = opts?.spell === undefined ? [] : Array.isArray(opts.spell) ? opts.spell : list.map(() => opts.spell as Spell);
+  return list.map((m, i) => ({ m, spell: spells[i] })).sort((a, b) => a.m - b.m);
+}
+
+interface Draft {
+  m: number;
+  /** Inicio y duración en ticks. */
+  st: number;
+  dt: number;
+  h: Hand;
+  unit: number;
+  override?: Spell;
+  slur?: "start" | "end";
+}
+
+/**
+ * Convierte la definición de una canción en notas, silencios, digitación y posiciones.
+ * Une las notas ligadas en una sola, da a las alturas de un acorde el mismo `unit` y recorta el
+ * margen de acierto de las notas muy seguidas. Lanza Error si alguna duración no cae en un tick.
+ */
+export function buildScore(song: SongDef): Score {
+  const { bar, pulse, time } = meterOf(song);
+  const keys = keysOf(song);
+  const twoHands = !!song.l;
+  const drafts: Draft[] = [];
+  const restDrafts: { h: Hand; st: number; dt: number }[] = [];
+  let unit = 0;
+  let lengthT = 0;
+
+  for (const [h, track] of tracksOf(song)) {
     let at = 0;
-    for (const [m, d] of track) {
-      if (m === 0) {
-        // un silencio largo se parte en silencios que no cruzan la barra de compás
-        let left = d;
-        let pos = at;
-        while (left > 0) {
-          const part = Math.min(bar - (pos % bar), left);
-          const centered = part >= bar ? px * (bar / 2 - 0.5) : 0;
-          rests.push({ h, d: part, x: STAFF_LEFT + pos * px + NOTE_OFFSET + centered });
-          pos += part;
-          left -= part;
-        }
+    // evento anterior con `tie`: sus alturas y los borradores que se prolongan
+    let tied: { key: string; drafts: Draft[] } | null = null;
+    for (const [nota, dur, opts] of track) {
+      const t = toTicks(dur);
+      const pitches = pitchesOf(nota, opts);
+      if (!pitches.length) {
+        restDrafts.push({ h, st: at, dt: t });
+        tied = null;
       } else {
-        notes.push({ m, d, s: at, h, x: STAFF_LEFT + at * px + NOTE_OFFSET, f: 0 });
+        const key = pitches.map((p) => p.m).join(",");
+        let own: Draft[];
+        if (tied && tied.key === key) {
+          own = tied.drafts;
+          own.forEach((d) => {
+            d.dt += t;
+            if (opts?.slur && !d.slur) d.slur = opts.slur;
+          });
+        } else {
+          const u = unit++;
+          own = pitches.map((p) => ({ m: p.m, st: at, dt: t, h, unit: u, override: p.spell, slur: opts?.slur }));
+          drafts.push(...own);
+        }
+        tied = opts?.tie ? { key, drafts: own } : null;
       }
-      at += d;
+      at += t;
     }
-    length = Math.max(length, at);
+    lengthT = Math.max(lengthT, at);
   }
 
-  // orden temporal; a igual tiempo, mano derecha primero
-  notes.sort((a, b) => a.s - b.s || (a.h === b.h ? 0 : a.h === "R" ? -1 : 1));
-  const withIds: ScoreNote[] = notes.map((n, id) => ({ ...n, id }));
+  // orden temporal; a igual tiempo, mano derecha primero (y de grave a agudo en un acorde)
+  drafts.sort((a, b) => a.st - b.st || (a.h === b.h ? 0 : a.h === "R" ? -1 : 1));
+  const barT = bar * TICKS;
+  const totalT = Math.ceil(lengthT / barT) * barT;
+  const total = totalT / TICKS;
 
-  assignFingering(withIds.filter((n) => n.h === "R"), { sign: 1, arpeggio: !!song.arpFingering, phraseBreaks: true, bar });
-  assignFingering(withIds.filter((n) => n.h === "L"), { sign: -1, bar });
+  const notes: ScoreNote[] = drafts.map((d, id) => {
+    const s = d.st / TICKS;
+    const sp = spell(d.m, keyAt(keys, Math.floor(d.st / barT)), d.override);
+    const n: ScoreNote = {
+      id, m: d.m, d: d.dt / TICKS, s, h: d.h, x: 0, f: 0, unit: d.unit,
+      win: { hit: HIT_WINDOW, perfect: PERFECT_WINDOW }, spell: { step: sp.step, alter: sp.alter },
+    };
+    if (d.slur) n.slur = d.slur;
+    return n;
+  });
+  const rests: Rest[] = restDrafts.map((r) => ({ h: r.h, s: r.st / TICKS, d: r.dt / TICKS }));
 
-  return { song, notes: withIds, rests, total: Math.ceil(length / bar) * bar, bar, px, twoHands };
+  clipWindows(notes);
+  assignFingering(eventsOf(notes.filter((n) => n.h === "R")), { sign: 1, arpeggio: !!song.arpFingering, phraseBreaks: true, bar });
+  assignFingering(eventsOf(notes.filter((n) => n.h === "L")), { sign: -1, bar });
+
+  const acc = accidentals(notes, keys, bar);
+  const accFirst = new Set<number>();
+  for (const n of notes) if (acc.has(n.id) && Math.round(n.s * TICKS) % barT === 0) accFirst.add(Math.round(n.s * TICKS) / barT);
+  const layout = layoutScore({ bar, total, onsets: [...notes.map((n) => n.s), ...rests.map((r) => r.s)], px: song.px, keys, accFirst });
+  for (const n of notes) n.x = layout.xAt(n.s);
+
+  return { song, notes, rests, total, bar, px: layout.px, pulse, time, keys, twoHands, layout };
+}
+
+/**
+ * Margen de acierto por nota (research R7): si el inicio anterior o siguiente de la misma mano
+ * está a menos de una corchea, el margen pasa a la mitad de esa distancia.
+ */
+function clipWindows(notes: ScoreNote[]): void {
+  for (const h of ["R", "L"] as const) {
+    const onsets = [...new Set(notes.filter((n) => n.h === h).map((n) => Math.round(n.s * TICKS)))].sort((a, b) => a - b);
+    const gapAt = new Map<number, number>();
+    onsets.forEach((t, i) => {
+      const prev = i > 0 ? t - onsets[i - 1] : Infinity;
+      const next = i < onsets.length - 1 ? onsets[i + 1] - t : Infinity;
+      gapAt.set(t, Math.min(prev, next) / TICKS);
+    });
+    for (const n of notes) {
+      if (n.h !== h) continue;
+      const gap = gapAt.get(Math.round(n.s * TICKS))!;
+      if (gap < 0.5) n.win = { hit: Math.min(HIT_WINDOW, gap / 2), perfect: Math.min(PERFECT_WINDOW, gap / 2) };
+    }
+  }
 }
 
 export const measureCount = (score: Score): number => score.total / score.bar;
 
 /** Compás (base 0) bajo la coordenada x de la partitura, recortado a la pieza. */
 export function measureAt(score: Score, x: number): number {
-  const i = Math.floor((x - STAFF_LEFT - 2) / (score.bar * score.px));
-  return Math.min(Math.max(i, 0), measureCount(score) - 1);
+  return score.layout.measureAt(x);
 }

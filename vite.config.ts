@@ -6,6 +6,8 @@ import { VitePWA } from "vite-plugin-pwa";
 // base relativa: funciona igual en https://usuario.github.io/Tecla/ que en un dominio propio
 export default defineConfig({
   base: "./",
+  // VexFlow con sus fuentes (≈ 720 KB) va en un chunk aparte que solo carga la lección (research R1)
+  build: { chunkSizeWarningLimit: 800 },
   plugins: [
     react(),
     // solo genera sw.js y el manifiesto en el build; el registro y los avisos están en src/pwa/
