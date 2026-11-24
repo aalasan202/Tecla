@@ -1,5 +1,6 @@
 import { SONGS } from "../music/songs";
 import { formatDuration, lastWeek, progress, streak } from "../state/progress";
+import { repertoireStars } from "../state/library";
 import { TopBar } from "../components/TopBar";
 import { hrefFor } from "../router";
 
@@ -11,7 +12,7 @@ export function ProgressScreen() {
   const weekSeconds = week.reduce((a, d) => a + d.seconds, 0);
   const totalSeconds = Object.values(p.days).reduce((a, b) => a + b, 0);
   const maxDay = Math.max(60, ...week.map((d) => d.seconds));
-  const stars = Object.values(p.best).reduce((a, b) => a + b, 0);
+  const stars = repertoireStars(p.best);
   const mastered = SONGS.filter((s) => (p.best[s.id] ?? 0) === 3).length;
   const days = streak(p.days);
 

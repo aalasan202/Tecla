@@ -77,3 +77,12 @@ export function formatDuration(seconds: number): string {
   const h = Math.floor(m / 60);
   return `${h} h ${m % 60} min`;
 }
+
+/** Olvida las estrellas de una pieza y «Continuar» si apuntaba a ella (al borrar una importada). */
+export function forgetSong(id: string): void {
+  progress.set((p) => {
+    const best = { ...p.best };
+    delete best[id];
+    return { best, last: p.last?.songId === id ? null : p.last };
+  });
+}

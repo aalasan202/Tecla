@@ -53,3 +53,22 @@ describe("rutas", () => {
     expect(parseRoute("#loquesea")).toEqual({ name: "home" });
   });
 });
+
+describe("forgetSong", () => {
+  it("quita las estrellas de la pieza y «Continuar» si era ella, sin tocar lo demás", async () => {
+    const { progress, forgetSong } = await import("./progress");
+    const last = { songId: "x", mode: "play" as const, hands: "both" as const, progress: 0.5, at: 1 };
+    progress.set({ best: { x: 2, oda: 3 }, last, days: { "2026-11-20": 60 } });
+    forgetSong("x");
+    expect(progress.get()).toEqual({ best: { oda: 3 }, last: null, days: { "2026-11-20": 60 } });
+  });
+
+  it("conserva «Continuar» si apunta a otra pieza", async () => {
+    const { progress, forgetSong } = await import("./progress");
+    const last = { songId: "oda", mode: "learn" as const, hands: "R" as const, progress: 0.1, at: 2 };
+    progress.set({ best: { x: 1, oda: 3 }, last, days: {} });
+    forgetSong("x");
+    expect(progress.get().last).toEqual(last);
+    expect(progress.get().best).toEqual({ oda: 3 });
+  });
+});

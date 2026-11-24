@@ -16,15 +16,19 @@ export function createStore<T extends object>(key: string, defaults: T, migrate?
     }
   }
 
-  function set(update: Partial<T> | ((prev: T) => Partial<T>)): void {
+  /** Devuelve true si el cambio se guardó en localStorage. */
+  function set(update: Partial<T> | ((prev: T) => Partial<T>)): boolean {
     const patch = typeof update === "function" ? update(value) : update;
     value = { ...value, ...patch };
+    let saved = true;
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
       /* sin almacenamiento: los cambios duran la sesión */
+      saved = false;
     }
     listeners.forEach((l) => l());
+    return saved;
   }
 
   const subscribe = (l: () => void) => {
@@ -35,7 +39,8 @@ export function createStore<T extends object>(key: string, defaults: T, migrate?
   return {
     get: () => value,
     set,
-    reset: () => set(defaults),
+    subscribe,
+    reset: () => void set(defaults),
     use: (): T => useSyncExternalStore(subscribe, () => value, () => value),
   };
 }

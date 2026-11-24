@@ -35,9 +35,9 @@ MUST NOT usar DOM ni APIs del navegador (Principio I); lo que las necesita va en
 
 **Purpose**: línea base en verde y herramientas de test
 
-- [ ] T001 En la rama `006-importar-midi-musicxml`, ejecutar `npm test` y `npm run build` en la raíz y confirmar que todo pasa (línea base)
-- [ ] T002 Añadir `happy-dom` como dependencia de desarrollo (`npm i -D happy-dom`) en `package.json`; no tocar `test.environment` de `vite.config.ts` (sigue `node`; los tests de `src/import/` lo cambian por archivo)
-- [ ] T003 [P] Añadir `dev-fixtures/` a `.gitignore`
+- [X] T001 En la rama `006-importar-midi-musicxml`, ejecutar `npm test` y `npm run build` en la raíz y confirmar que todo pasa (línea base)
+- [X] T002 Añadir `happy-dom` como dependencia de desarrollo (`npm i -D happy-dom`) en `package.json`; no tocar `test.environment` de `vite.config.ts` (sigue `node`; los tests de `src/import/` lo cambian por archivo)
+- [X] T003 [P] Añadir `dev-fixtures/` a `.gitignore`
 
 ---
 
@@ -49,22 +49,22 @@ MUST NOT usar DOM ni APIs del navegador (Principio I); lo que las necesita va en
 
 ### Tests (escribir primero, deben fallar)
 
-- [ ] T004 [P] Crear `src/state/store.test.ts`: con un `localStorage` falso en `globalThis` (objeto con `getItem`/`setItem`/`removeItem`), `createStore("k", {a: 1}).set({a: 2})` devuelve `true` y guarda; si `setItem` lanza (simular `QuotaExceededError`), `set` devuelve `false`, el valor en memoria se actualiza igualmente y los suscriptores se notifican (comportamiento actual)
-- [ ] T005 [P] Ampliar `src/state/progress.test.ts`: `forgetSong("x")` quita `best.x` y pone `last` a `null` si `last.songId === "x"`; no toca `best` de otras piezas, ni `last` de otra pieza, ni `days`
-- [ ] T006 [P] Crear `src/state/library.test.ts`: sin importadas, `allSongs()` es igual a `SONGS` (mismo orden) y `findSong("oda")` devuelve la pieza; `findSong("nada")` → `undefined`; `isImported("imp-0123abcd")` → `true`, `isImported("oda")` → `false`; con una importada en el almacén `imported` (inyectada con `imported.set`), `allSongs()` = `SONGS` seguido de ella y `findSong` la encuentra; `repertoireStars({oda: 3, "imp-x": 2})` → `3`
+- [X] T004 [P] Crear `src/state/store.test.ts`: con un `localStorage` falso en `globalThis` (objeto con `getItem`/`setItem`/`removeItem`), `createStore("k", {a: 1}).set({a: 2})` devuelve `true` y guarda; si `setItem` lanza (simular `QuotaExceededError`), `set` devuelve `false`, el valor en memoria se actualiza igualmente y los suscriptores se notifican (comportamiento actual)
+- [X] T005 [P] Ampliar `src/state/progress.test.ts`: `forgetSong("x")` quita `best.x` y pone `last` a `null` si `last.songId === "x"`; no toca `best` de otras piezas, ni `last` de otra pieza, ni `days`
+- [X] T006 [P] Crear `src/state/library.test.ts`: sin importadas, `allSongs()` es igual a `SONGS` (mismo orden) y `findSong("oda")` devuelve la pieza; `findSong("nada")` → `undefined`; `isImported("imp-0123abcd")` → `true`, `isImported("oda")` → `false`; con una importada en el almacén `imported` (inyectada con `imported.set`), `allSongs()` = `SONGS` seguido de ella y `findSong` la encuentra; `repertoireStars({oda: 3, "imp-x": 2})` → `3`
 
 ### Implementation
 
-- [ ] T007 Cambiar `set` en `src/state/store.ts` para devolver `boolean` (`true` si `localStorage.setItem` no lanzó); el resto igual. Las llamadas actuales no cambian (hace pasar T004)
-- [ ] T008 [P] Añadir `forgetSong(id: string): void` en `src/state/progress.ts` (hace pasar T005)
-- [ ] T009 [P] Crear `src/music/import/types.ts` con los tipos de [data-model.md](data-model.md): `RawNote { pitch; start; dur }`, `RawPart { name?; staff?: 1 | 2; notes }`, `RawPiece { format: "midi" | "musicxml"; title?; tempo?; times: { at; beats; beatType }[]; parts; notPiano: boolean; ignored: { grace: number; cue: number } }`, `RejectReason = "tooLarge" | "unreadable" | "notScore" | "empty" | "notPiano" | "tooManyParts" | "badNotes" | "timeSignature"`, `ImportCheck`, `Proposal { song: Omit<SongDef, "id" | "level">; metrics; level: 1 | 2 | 3 | 4; warnings; heavy: boolean }`, `Metrics { bars; notes; twoHands; accidentals; rightSpan; eighthShare; simultaneousShare }`, `WarningKind = "handsSplit" | "chords" | "durations" | "cutAtBar" | "dropped" | "grace" | "farFromOriginal"`, `Warning { kind; bars: number[] }`, `ImportedSong { def: SongDef; source: { format; fileName; size }; hash: string; importedAt: number; warnings: Warning[] }`
-- [ ] T010 [P] Crear `src/music/import/errors.ts` con `class ImportError extends Error { constructor(readonly reason: RejectReason, readonly detail?: { count?: number; bars?: number[] }) }`
-- [ ] T011 Crear `src/state/imported.ts` solo con el almacén `imported = createStore<{ songs: ImportedSong[] }>("tecla-imported", { songs: [] })` (las operaciones llegan en US1/US4)
-- [ ] T012 Crear `src/state/library.ts` con `allSongs()`, `findSong(id)`, `useLibrary()` (suscrito a `imported.use()`; devuelve `[...SONGS, ...songs.map(s => s.def)]` memorizado), `isImported(id) = id.startsWith("imp-")` y `repertoireStars(best)` que suma solo ids de `SONGS` (hace pasar T006)
-- [ ] T013 [P] En `src/screens/LessonScreen.tsx`, sustituir los dos `SONGS.find(...)` por `findSong(...)` de `src/state/library.ts`
-- [ ] T014 [P] En `src/screens/Home.tsx`, usar `findSong` para la pieza de «Continuar» (si `last.songId` no existe, como hoy, primera pieza del repertorio) y `repertoireStars(p.best)` para el total de estrellas; `maxStars` y el texto «N piezas en 4 niveles» siguen con `SONGS` (FR-019)
-- [ ] T015 [P] En `src/screens/ProgressScreen.tsx`, calcular estrellas con `repertoireStars(p.best)`; «Piezas dominadas» y la lista por pieza siguen solo con `SONGS` (FR-019)
-- [ ] T016 [P] En `src/screens/Songs.tsx`, tomar la lista de `useLibrary()` en lugar de `SONGS` (filtros y niveles sin cambios)
+- [X] T007 Cambiar `set` en `src/state/store.ts` para devolver `boolean` (`true` si `localStorage.setItem` no lanzó); el resto igual. Las llamadas actuales no cambian (hace pasar T004)
+- [X] T008 [P] Añadir `forgetSong(id: string): void` en `src/state/progress.ts` (hace pasar T005)
+- [X] T009 [P] Crear `src/music/import/types.ts` con los tipos de [data-model.md](data-model.md): `RawNote { pitch; start; dur }`, `RawPart { name?; staff?: 1 | 2; notes }`, `RawPiece { format: "midi" | "musicxml"; title?; tempo?; times: { at; beats; beatType }[]; parts; notPiano: boolean; ignored: { grace: number; cue: number } }`, `RejectReason = "tooLarge" | "unreadable" | "notScore" | "empty" | "notPiano" | "tooManyParts" | "badNotes" | "timeSignature"`, `ImportCheck`, `Proposal { song: Omit<SongDef, "id" | "level">; metrics; level: 1 | 2 | 3 | 4; warnings; heavy: boolean }`, `Metrics { bars; notes; twoHands; accidentals; rightSpan; eighthShare; simultaneousShare }`, `WarningKind = "handsSplit" | "chords" | "durations" | "cutAtBar" | "dropped" | "grace" | "farFromOriginal"`, `Warning { kind; bars: number[] }`, `ImportedSong { def: SongDef; source: { format; fileName; size }; hash: string; importedAt: number; warnings: Warning[] }`
+- [X] T010 [P] Crear `src/music/import/errors.ts` con `class ImportError extends Error { constructor(readonly reason: RejectReason, readonly detail?: { count?: number; bars?: number[] }) }`
+- [X] T011 Crear `src/state/imported.ts` solo con el almacén `imported = createStore<{ songs: ImportedSong[] }>("tecla-imported", { songs: [] })` (las operaciones llegan en US1/US4)
+- [X] T012 Crear `src/state/library.ts` con `allSongs()`, `findSong(id)`, `useLibrary()` (suscrito a `imported.use()`; devuelve `[...SONGS, ...songs.map(s => s.def)]` memorizado), `isImported(id) = id.startsWith("imp-")` y `repertoireStars(best)` que suma solo ids de `SONGS` (hace pasar T006)
+- [X] T013 [P] En `src/screens/LessonScreen.tsx`, sustituir los dos `SONGS.find(...)` por `findSong(...)` de `src/state/library.ts`
+- [X] T014 [P] En `src/screens/Home.tsx`, usar `findSong` para la pieza de «Continuar» (si `last.songId` no existe, como hoy, primera pieza del repertorio) y `repertoireStars(p.best)` para el total de estrellas; `maxStars` y el texto «N piezas en 4 niveles» siguen con `SONGS` (FR-019)
+- [X] T015 [P] En `src/screens/ProgressScreen.tsx`, calcular estrellas con `repertoireStars(p.best)`; «Piezas dominadas» y la lista por pieza siguen solo con `SONGS` (FR-019)
+- [X] T016 [P] En `src/screens/Songs.tsx`, tomar la lista de `useLibrary()` en lugar de `SONGS` (filtros y niveles sin cambios)
 
 **Checkpoint**: `npm test` y `npm run build` en verde; la app se ve y funciona igual que antes
 

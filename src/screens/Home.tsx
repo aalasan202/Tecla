@@ -1,6 +1,7 @@
 import { SONGS } from "../music/songs";
 import { buildScore, measureCount } from "../music/score";
 import { progress, lastWeek, streak } from "../state/progress";
+import { findSong, repertoireStars } from "../state/library";
 import { TopBar } from "../components/TopBar";
 import { MiniStaff } from "../components/MiniStaff";
 import { IconPiano, IconPlay, IconProgress, IconSettings, IconSongs } from "../components/Icons";
@@ -11,12 +12,13 @@ const HANDS_LABEL = { both: "", R: " · mano derecha", L: " · mano izquierda" }
 
 export function Home() {
   const p = progress.use();
-  const last = p.last && SONGS.some((s) => s.id === p.last!.songId) ? p.last : null;
-  const song = SONGS.find((s) => s.id === last?.songId) ?? SONGS[0];
+  const lastSong = p.last ? findSong(p.last.songId) : undefined;
+  const last = lastSong ? p.last : null;
+  const song = lastSong ?? SONGS[0];
   const measures = measureCount(buildScore(song));
   const fraction = last?.progress ?? 0;
   const measure = Math.min(measures, Math.floor(fraction * measures) + 1);
-  const totalStars = Object.values(p.best).reduce((a, b) => a + b, 0);
+  const totalStars = repertoireStars(p.best);
   const maxStars = SONGS.length * 3;
   const week = lastWeek(p.days);
   const days = streak(p.days);

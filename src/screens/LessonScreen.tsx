@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SONGS } from "../music/songs";
+import { findSong } from "../state/library";
 import { buildScore, measureCount } from "../music/score";
 import { noteName } from "../music/theory";
 import type { ScoreNote } from "../music/types";
@@ -39,7 +39,7 @@ const LOOP_PLAY_HINT = " Entre repeticiones hay un compás de descanso para volv
 const MODES: [Mode, string][] = [["listen", "Escuchar"], ["learn", "Aprender"], ["play", "Tocar"]];
 
 export function LessonScreen({ songId }: { songId: string }) {
-  const song = SONGS.find((s) => s.id === songId);
+  const song = findSong(songId);
   if (!song) {
     return (
       <div className="screen">
@@ -54,7 +54,7 @@ export function LessonScreen({ songId }: { songId: string }) {
 }
 
 function LessonView({ songId }: { songId: string }) {
-  const song = SONGS.find((s) => s.id === songId)!;
+  const song = findSong(songId)!;
   const score = useMemo(() => buildScore(song), [song]);
   const prefs = settings.use();
   const resume = progress.get().last?.songId === songId ? progress.get().last : null;

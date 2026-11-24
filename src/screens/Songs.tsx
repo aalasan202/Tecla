@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SONGS } from "../music/songs";
+import { useLibrary } from "../state/library";
 import type { SongDef } from "../music/types";
 import { progress } from "../state/progress";
 import { TopBar } from "../components/TopBar";
@@ -19,8 +19,9 @@ const LEVEL_TEXT: Record<number, string> = {
 
 export function Songs() {
   const { best } = progress.use();
+  const songs = useLibrary();
   const [filter, setFilter] = useState<Filter>("all");
-  const shown = SONGS.filter((s) => filter === "all" || (filter === "two") === !!s.l);
+  const shown = songs.filter((s) => filter === "all" || (filter === "two") === !!s.l);
   const levels = [...new Set(shown.map(levelOf))].sort();
 
   return (
