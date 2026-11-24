@@ -20,7 +20,9 @@ La práctica actual tiene límites que condicionan qué se puede importar:
 - Cada mano toca **una nota cada vez** (sin acordes dentro de la misma mano).
 - Las duraciones que se dibujan son corchea, negra, negra con puntillo, blanca, blanca con
   puntillo y redonda, además de los silencios.
-- Solo hay compases de **4/4 y 3/4**, y no hay armaduras: las alteraciones se ven nota a nota.
+- El repertorio incluido usa compases de **4/4 y 3/4**, y no hay armaduras: las alteraciones se ven
+  nota a nota. El motor y la partitura funcionan con cualquier número de negras por compás, así que
+  **2/4** también se puede practicar sin cambios en ellos.
 - Una pieza es de una mano (derecha) o de dos manos (derecha e izquierda, un pentagrama cada una).
 - Los niveles van del 1 al 4, cada uno con su descripción en la pantalla de Canciones.
 
@@ -42,6 +44,14 @@ La práctica actual tiene límites que condicionan qué se puede importar:
 - Q: En Inicio y en Progreso, ¿las piezas importadas cuentan en los totales (número de piezas,
   estrellas sobre el máximo)? → A: No; los totales se refieren solo al repertorio incluido. Las
   importadas guardan sus estrellas, pero no suman (FR-019).
+
+### Session 2026-11-24
+
+- Q: ¿Se admiten piezas en compás de 2/4 (marchas, polcas, muchas canciones infantiles)? → A: Sí.
+  Se aceptan 4/4, 3/4 y 2/4; siguen rechazándose los compases con denominador distinto de 4
+  (2/2, 6/8…) y los cambios de compás (FR-010). En 2/4 la nota más larga es la blanca: lo que
+  dure más se corta en la barra con el aviso habitual. El 2/4 no sube el nivel sugerido: es tan
+  sencillo de contar como el 4/4 (FR-006).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -205,7 +215,8 @@ un lector de pantalla lo anuncia como deshabilitado.
   coherente con la descripción de cada nivel en Canciones:
   - Nivel 1: una mano, notas dentro de cinco teclas blancas seguidas, sin corcheas ni alteraciones.
   - Nivel 2: una mano, con saltos fuera de esa posición o corcheas.
-  - Nivel 3: compás de 3/4, alteraciones o dos manos que rara vez tocan a la vez.
+  - Nivel 3: compás de 3/4, alteraciones o dos manos que rara vez tocan a la vez (el 2/4 no sube
+    el nivel por sí solo).
   - Nivel 4: dos manos que tocan a la vez con frecuencia, o saltos grandes y pasajes rápidos.
   Se elige el nivel más alto cuyo criterio se cumpla.
 - **FR-007**: Una nota MUST considerarse «no legible» si su altura está fuera de las 88 teclas del
@@ -230,7 +241,7 @@ un lector de pantalla lo anuncia como deshabilitado.
     semicorcheas y tresillos: se ajustan a la duración representable más cercana, manteniendo
     cada mano en compases completos.
   - Notas ligadas que suman una duración representable: se unen en una sola nota.
-  Las piezas en compases distintos de 4/4 y 3/4, o con cambios de compás, MUST rechazarse
+  Las piezas en compases distintos de 4/4, 3/4 y 2/4, o con cambios de compás, MUST rechazarse
   explicando el motivo, porque simplificarlas cambiaría el ritmo de toda la pieza.
   Si la simplificación afecta a más de la mitad de los compases, el resumen MUST advertir de que
   la pieza importada puede diferir bastante del original.

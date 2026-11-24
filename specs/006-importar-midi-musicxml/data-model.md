@@ -43,7 +43,7 @@ RejectReason = "tooLarge" | "unreadable" | "notScore" | "empty" | "notPiano"
 | `notPiano` | Percusión o instrumento no piano | «Solo se pueden importar piezas de piano.» |
 | `tooManyParts` | > 2 partes con notas | «Solo se pueden importar piezas de piano a una o dos manos.» |
 | `badNotes` | Notas fuera de 21–108 o sin duración | «N notas no se pueden leer (compases …).» |
-| `timeSignature` | Compás que no es 4/4 ni 3/4, o cambios | «Solo se admiten compases de 4/4 y 3/4.» |
+| `timeSignature` | Compás que no es 4/4, 3/4 ni 2/4, o cambios | «Solo se admiten compases de 4/4, 3/4 y 2/4.» |
 
 ## Proposal (lo que muestra el resumen)
 
@@ -55,7 +55,7 @@ RejectReason = "tooLarge" | "unreadable" | "notScore" | "empty" | "notPiano"
 | `warnings` | `Warning[]` | En el orden en que se muestran |
 | `heavy` | `boolean` | > 300 compases o > 1 500 notas (FR-011) |
 
-**Metrics**: `{ bars, notes, twoHands, accidentals, rightSpan, eighthShare, simultaneousShare }`.
+**Metrics**: `{ bar (2, 3 o 4), bars, notes, twoHands, accidentals, rightSpan, eighthShare, simultaneousShare }`.
 
 **Warning**: `{ kind, bars: number[] }`, con `kind` en `"handsSplit" | "chords" |
 "durations" | "cutAtBar" | "dropped" | "grace" | "farFromOriginal"`.

@@ -8,7 +8,7 @@ Decisiones de la fase 0. Cada una: **Decisión**, **Razón**, **Alternativas**.
 |-------|-------|--------------|
 | Una pieza es `SongDef`: `n` (una mano) o `r` + `l`, cada una `[midi, pulsos][]`, `0` = silencio | `src/music/types.ts` | El importador produce un `SongDef`; motor, partitura, digitación y bucle no cambian. |
 | Duraciones dibujadas: 0,5 · 1 · 1,5 · 2 · 3 · 4 (y silencios) | `src/components/Staff.tsx` | Conjunto de duraciones representables `D = {0.5, 1, 1.5, 2, 3, 4}`. |
-| Compás = pulsos por compás (`bar`: 4 o 3) | `score.ts` | Solo 4/4 y 3/4 (denominador 4). |
+| Compás = pulsos por compás (`bar`: 4, 3 o 2) | `score.ts`, `Staff.tsx`, `lesson.ts` | Cualquier compás de denominador 4 funciona; se admiten 4/4, 3/4 y 2/4 (clarificación 2026-11-24). |
 | Las canciones se buscan en `SONGS` en `Home`, `LessonScreen`, `ProgressScreen`, `Songs` | `src/screens/` | Hace falta un catálogo `SONGS + importadas` para buscar, sin tocar los totales. |
 | `Home` y `ProgressScreen` suman **todas** las entradas de `progress.best` | `Home.tsx:19`, `ProgressScreen.tsx:14` | Hoy solo hay ids del repertorio; con importadas habría que filtrar por `SONGS` (FR-019). |
 | `createStore.set` traga los errores de `localStorage` | `src/state/store.ts` | FR-016 necesita saber si se guardó: `set` pasa a devolver `boolean`. |
@@ -74,7 +74,8 @@ Decisiones de la fase 0. Cada una: **Decisión**, **Razón**, **Alternativas**.
 Función pura `convertPiece(raw, opts)` en `src/music/import/convert.ts`. Pasos por parte, en orden:
 
 1. **Rechazos**: altura fuera de 21–108, o duración/inicio no numéricos → «notas no legibles»
-   con número y compases (FR-007). Compás distinto de 4/4 y 3/4, o cambios de compás → rechazo.
+   con número y compases (FR-007). Compás distinto de 4/4, 3/4 y 2/4, o cambios de compás → rechazo. En 2/4 ninguna nota pasa de
+   2 pulsos (se corta en la barra).
 2. **Reparto de manos** (una sola parte): si tiene notas simultáneas, cada nota con altura ≥ 60
    va a la derecha y < 60 a la izquierda (aviso «manos repartidas»). Sin notas simultáneas, toda
    la parte es la mano derecha (precisión de FR-008: «Martinillo» y «Au clair de la lune» bajan a
@@ -106,7 +107,7 @@ en los que suenan las dos manos a la vez.
 | Nivel | Se cumple si… |
 |-------|---------------|
 | 4 | dos manos y (≥ 40 % de inicios simultáneos, o > 25 % de corcheas) |
-| 3 | 3/4, alguna alteración, o dos manos |
+| 3 | 3/4, alguna alteración, o dos manos (el 2/4 cuenta como el 4/4) |
 | 2 | extensión de la derecha > 5 teclas blancas, o > 10 % de corcheas |
 | 1 | el resto |
 

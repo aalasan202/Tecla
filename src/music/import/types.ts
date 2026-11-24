@@ -46,6 +46,8 @@ export interface RejectDetail {
 }
 
 export interface Metrics {
+  /** Pulsos por compás (2, 3 o 4). */
+  bar: number;
   bars: number;
   notes: number;
   twoHands: boolean;

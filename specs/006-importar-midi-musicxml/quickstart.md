@@ -14,7 +14,9 @@ Lo que deben cubrir los tests (ver [contracts/import.md](contracts/import.md)):
   notas, duraciones, manos, compás y tempo.
 - **SC-003**: `suggestLevel` da el nivel real en las 12 piezas (research R5).
 - **SC-004**: cada `RejectReason` con su archivo de prueba (bytes al azar, MIDI cortado, MIDI sin
-  notas, MIDI con canal 10, 3 pistas, nota 120, compás 6/8, cambio de compás, `opus`).
+  notas, MIDI con canal 10, 3 pistas, nota 120, compás 6/8, compás 2/2, cambio de compás, `opus`).
+- **2/4**: una pieza en 2/4 se importa con `bar: 2`, compases completos de 2 pulsos, ninguna nota
+  de más de 2 pulsos y el mismo nivel que tendría en 4/4.
 - **FR-010**: acordes, semicorcheas, tresillos, notas que cruzan la barra y ligaduras dan las
   duraciones esperadas, compases completos y los avisos con sus compases.
 - **FR-008**: una pista con acordes se reparte por el Do central; «Martinillo» en una sola pista
@@ -25,7 +27,8 @@ Lo que deben cubrir los tests (ver [contracts/import.md](contracts/import.md)):
 ## 2. Archivos para la prueba manual
 
 `node scripts/export-fixtures.mjs` escribe en `dev-fixtures/` (ignorado en git) las 12 piezas en
-`.mid` y `.musicxml`, más los archivos no válidos de los tests. Para casos reales, usar 3 o 4
+`.mid` y `.musicxml`, una pieza en 2/4 (`dos-cuartos.mid` y `.musicxml`), más los archivos no
+válidos de los tests. Para casos reales, usar 3 o 4
 piezas de piano sencillas de dominio público descargadas de un sitio de partituras libres
 (una en `.mxl`, una a una sola pista con acordes, una de más de 300 compases).
 
@@ -58,3 +61,7 @@ piezas de piano sencillas de dominio público descargadas de un sitio de partitu
     por dentro, sin desplazar la página (FR-018).
 13. En DevTools, llenar el almacenamiento (o simular cuota) e importar: aviso «sin espacio» y nada
     a medias (FR-016).
+14. Importar `dos-cuartos.musicxml`: el resumen muestra «2/4»; en la lección la partitura dibuja
+    2/4 con barras cada 2 pulsos, el metrónomo marca el pulso fuerte cada 2 y el bucle elige
+    compases de 2/4. Importar `dos-medios.musicxml` (2/2): se rechaza con «Solo se admiten
+    compases de 4/4, 3/4 y 2/4.» (clarificación 2026-11-24).

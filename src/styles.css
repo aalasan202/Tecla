@@ -182,6 +182,59 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .song-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .stars { color: var(--accent); letter-spacing: 2px; font-size: 14px; }
 .tag { font-size: 11px; font-weight: 600; color: var(--left-ink); border: 1px solid var(--left); border-radius: 999px; padding: 0 8px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag.imported { color: var(--warm-ink); border-color: var(--warm); }
+.song-cell { position: relative; display: flex; }
+.song-cell > .song-card { flex: 1; min-width: 0; }
+.song-cell.imported .song-card b { padding-right: 36px; }
+.song-more { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
+.song-more:hover, .song-more:focus-visible { background: var(--grey-soft); color: var(--ink); }
+
+/* ---------- importar ---------- */
+.song-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn.soon:disabled { cursor: not-allowed; color: var(--muted); background: var(--grey-soft); border-color: var(--line); display: inline-flex; align-items: center; gap: 8px; }
+.soon-tag { font-size: 11px; font-weight: 600; color: var(--grey-ink); border: 1px solid var(--faint); border-radius: 999px; padding: 0 8px; }
+.btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.btn.soon:disabled { opacity: 1; }
+.btn.danger-outline { color: var(--bad); border-color: var(--bad); }
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
+  background: rgba(10, 16, 40, 0.45);
+}
+.dialog {
+  width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 14px; padding: 20px 22px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 40px rgba(10, 16, 40, 0.28);
+}
+.dialog h2 { font-size: 22px; outline: none; }
+.dialog h3 { font-size: 15px; margin: 0 0 4px; }
+.dialog p { margin: 0; }
+.dialog-body { display: flex; flex-direction: column; gap: 10px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.dialog-status { font-weight: 600; }
+.dialog-form { display: flex; flex-direction: column; gap: 14px; }
+.dialog-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); }
+.dialog-field input { font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-height: 44px; padding: 0 12px; }
+.dialog-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dialog-levels { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.dialog-levels legend { font-size: 14px; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.dialog-levels .seg button { min-width: 44px; justify-content: center; }
+.dialog-levels small { font-size: 12px; font-weight: 500; }
+.dialog-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 0; }
+.dialog-facts div { background: var(--bg); border-radius: 10px; padding: 8px 12px; }
+.dialog-facts dt { font-size: 12px; color: var(--muted); }
+.dialog-facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dialog-notes ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.dialog-warn { padding: 10px 14px; border-radius: 10px; background: var(--warm-soft); color: var(--warm-ink); font-weight: 600; font-size: 14px; }
+.dialog-file { font-size: 13px; overflow-wrap: anywhere; }
+.dialog-menu { display: flex; flex-direction: column; gap: 8px; }
+.dialog-menu .btn { text-align: left; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .dialog-backdrop { padding: 8px; }
+  .dialog { max-height: calc(100dvh - 16px); padding: 14px 18px; gap: 10px; }
+  .dialog h2 { font-size: 19px; }
+  .dialog-actions { position: sticky; bottom: -14px; margin: 0 -18px -14px; padding: 10px 18px 14px; background: var(--surface); border-top: 1px solid var(--line); }
+}
 
 /* ---------- controles comunes ---------- */
 .seg { display: inline-flex; flex-wrap: wrap; gap: 3px; background: var(--line); padding: 3px; border-radius: 12px; align-self: flex-start; }
