@@ -24,7 +24,7 @@ Objetivo: un producto público para aprender piano desde cero con un teclado MID
 ## v0.5 · Contenido
 - Importar MIDI y MusicXML para no escribir las notas a mano.✅
 - Partitura con motor profesional (VexFlow) cuando el repertorio lo necesite: ligaduras, acordes, armaduras.✅
-- Ampliar el repertorio de dominio público por niveles.
+- Ampliar el repertorio de dominio público por niveles.✅
 - Introducir el pedal sustain en las piezas a partir del nivel 3.  Sale en la partitura pero no puntua para evaluar.
 
 ## v0.6 · Curso y ejercicios

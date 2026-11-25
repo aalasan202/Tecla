@@ -16,9 +16,9 @@ const detailOf = (s: SongDef): string => s.level.split(" · ").slice(1).join(" �
 
 const LEVEL_TEXT: Record<number, string> = {
   1: "Una mano, cinco dedos, sin moverse del sitio.",
-  2: "Saltos y corcheas con la mano derecha.",
-  3: "Compás de 3/4, sostenidos y las dos manos.",
-  4: "Dos manos con más independencia y arpegios.",
+  2: "Saltos, cambios de posición y corcheas con la mano derecha.",
+  3: "Compás de 3/4, alteraciones, acordes y las dos manos.",
+  4: "Dos manos independientes: arpegios, cánones y 6/8.",
 };
 
 export function Songs() {

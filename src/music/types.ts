@@ -32,6 +32,11 @@ export interface SongDef {
   id: string;
   title: string;
   level: string;
+  /**
+   * Origen que justifica el dominio público: compositor con fechas o procedencia popular, y
+   * «arreglo» o «fragmento» si aplica. Obligatorio en el repertorio incluido.
+   */
+  origin?: string;
   /** Pulsos por minuto: negras en x/4, negras con puntillo en 6/8. */
   tempo: number;
   /** Negras por compás (4 por defecto; en 6/8 se deduce: 3). */

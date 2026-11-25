@@ -1,4 +1,5 @@
 import type { RawTrack, SongDef, Track } from "./types";
+import { MORE } from "./repertoire";
 
 /** Arpegio de tres notas en corcheas, subiendo y bajando dos veces (un compás de 4/4). */
 const arp = (a: number, b: number, c: number): RawTrack => [a, b, c, b, a, b, c, b].map((m) => [m, 0.5] as [number, number]);
@@ -9,30 +10,36 @@ const SOL: number[] = [47, 50, 55];
 /** Un compás de 4/4 con dos acordes de blanca. */
 const halves = (a: number[], b: number[]): Track => [[a, 2], [b, 2]];
 
-export const SONGS: SongDef[] = [
+/** Las 12 piezas de partida (v0.2–v0.4). */
+const BASE: SongDef[] = [
   {
     id: "cinco", title: "Cinco dedos", level: "Nivel 1 · Mano derecha", tempo: 80,
+    origin: "Ejercicio del proyecto (posición de cinco dedos)",
     n: [[60, 1], [62, 1], [64, 1], [65, 1], [67, 4], [65, 1], [64, 1], [62, 1], [60, 1], [60, 4]],
   },
   {
     id: "oda", title: "Himno a la alegría", level: "Nivel 1 · Beethoven", tempo: 90,
+    origin: "Ludwig van Beethoven (1770–1827), Sinfonía n.º 9, 1824; melodía",
     n: [[64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1], [60, 1], [60, 1], [62, 1], [64, 1], [64, 1.5], [62, 0.5], [62, 2],
       [64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1], [60, 1], [60, 1], [62, 1], [64, 1], [62, 1.5], [60, 0.5], [60, 2]],
   },
   {
     id: "estrellita", title: "Estrellita", level: "Nivel 2 · Popular", tempo: 90,
+    origin: "Popular francesa, s. XVIII («Ah! vous dirai-je, maman»)",
     n: [[60, 1], [60, 1], [67, 1], [67, 1], [69, 1], [69, 1], [67, 2], [65, 1], [65, 1], [64, 1], [64, 1], [62, 1], [62, 1], [60, 2],
       [67, 1], [67, 1], [65, 1], [65, 1], [64, 1], [64, 1], [62, 2], [67, 1], [67, 1], [65, 1], [65, 1], [64, 1], [64, 1], [62, 2],
       [60, 1], [60, 1], [67, 1], [67, 1], [69, 1], [69, 1], [67, 2], [65, 1], [65, 1], [64, 1], [64, 1], [62, 1], [62, 1], [60, 2]],
   },
   {
     id: "martinillo", title: "Martinillo", level: "Nivel 2 · Corcheas", tempo: 100,
+    origin: "Popular francesa, s. XVIII («Frère Jacques»)",
     n: [[60, 1], [62, 1], [64, 1], [60, 1], [60, 1], [62, 1], [64, 1], [60, 1], [64, 1], [65, 1], [67, 2], [64, 1], [65, 1], [67, 2],
       [67, 0.5], [69, 0.5], [67, 0.5], [65, 0.5], [64, 1], [60, 1], [67, 0.5], [69, 0.5], [67, 0.5], [65, 0.5], [64, 1], [60, 1],
       [60, 1], [55, 1], [60, 2], [60, 1], [55, 1], [60, 2]],
   },
   {
     id: "luna", title: "Au clair de la lune", level: "Nivel 2 · Popular francesa", tempo: 90,
+    origin: "Popular francesa, s. XVIII",
     n: [[60, 1], [60, 1], [60, 1], [62, 1], [64, 2], [62, 2], [60, 1], [64, 1], [62, 1], [62, 1], [60, 4],
       [60, 1], [60, 1], [60, 1], [62, 1], [64, 2], [62, 2], [60, 1], [64, 1], [62, 1], [62, 1], [60, 4],
       [62, 1], [62, 1], [62, 1], [62, 1], [57, 2], [57, 2], [62, 1], [60, 1], [59, 1], [57, 1], [55, 4],
@@ -40,6 +47,7 @@ export const SONGS: SongDef[] = [
   },
   {
     id: "minueto", title: "Minueto en Sol", level: "Nivel 3 · Petzold (atrib. Bach) · 3/4", tempo: 90, bar: 3, px: 64, key: 1,
+    origin: "Christian Petzold (1677–1733), atribuido a J. S. Bach; fragmento",
     n: [[74, 1], [67, 0.5], [69, 0.5], [71, 0.5], [72, 0.5], [74, 1], [67, 1], [67, 1],
       [76, 1], [72, 0.5], [74, 0.5], [76, 0.5], [78, 0.5], [79, 1], [67, 1], [67, 1],
       [72, 1], [74, 0.5], [72, 0.5], [71, 0.5], [69, 0.5], [71, 1], [72, 0.5], [71, 0.5], [69, 0.5], [67, 0.5],
@@ -47,6 +55,7 @@ export const SONGS: SongDef[] = [
   },
   {
     id: "elisa", title: "Para Elisa", level: "Nivel 3 · Beethoven · 3/4", tempo: 70, bar: 3, px: 64,
+    origin: "Ludwig van Beethoven (1770–1827), WoO 59, 1810; fragmento",
     n: [[0, 2], [76, 0.5], [75, 0.5],
       [76, 0.5], [75, 0.5], [76, 0.5], [71, 0.5], [74, 0.5], [72, 0.5], [69, 1.5], [60, 0.5], [64, 0.5], [69, 0.5],
       [71, 1.5], [64, 0.5], [68, 0.5], [71, 0.5], [72, 1.5], [64, 0.5], [76, 0.5], [75, 0.5],
@@ -55,17 +64,20 @@ export const SONGS: SongDef[] = [
   },
   {
     id: "pregunta", title: "Pregunta y respuesta", level: "Nivel 3 · Dos manos", tempo: 80,
+    origin: "Ejercicio del proyecto",
     r: [[60, 1], [62, 1], [64, 1], [65, 1], [67, 4], [0, 8], [64, 2], [62, 2], [60, 4]],
     l: [[0, 8], [48, 1], [50, 1], [52, 1], [53, 1], [55, 4], [48, 2], [55, 2], [48, 4]],
   },
   {
     id: "oda2", title: "Himno a la alegría a dos manos", level: "Nivel 3 · Dos manos", tempo: 80,
+    origin: "Ludwig van Beethoven (1770–1827); arreglo del proyecto",
     r: [[64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1], [60, 1], [60, 1], [62, 1], [64, 1], [64, 1.5], [62, 0.5], [62, 2],
       [64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1], [60, 1], [60, 1], [62, 1], [64, 1], [62, 1.5], [60, 0.5], [60, 2]],
     l: [[48, 4], [55, 4], [48, 4], [55, 4], [48, 4], [55, 4], [48, 4], [55, 2], [48, 2]],
   },
   {
     id: "estrellita2", title: "Estrellita a dos manos", level: "Nivel 4 · Dos manos", tempo: 85,
+    origin: "Popular francesa, s. XVIII; arreglo del proyecto",
     r: [[60, 1], [60, 1], [67, 1], [67, 1], [69, 1], [69, 1], [67, 2], [65, 1], [65, 1], [64, 1], [64, 1], [62, 1], [62, 1], [60, 2],
       [67, 1], [67, 1], [65, 1], [65, 1], [64, 1], [64, 1], [62, 2], [67, 1], [67, 1], [65, 1], [65, 1], [64, 1], [64, 1], [62, 2],
       [60, 1], [60, 1], [67, 1], [67, 1], [69, 1], [69, 1], [67, 2], [65, 1], [65, 1], [64, 1], [64, 1], [62, 1], [62, 1], [60, 2]],
@@ -75,6 +87,7 @@ export const SONGS: SongDef[] = [
   },
   {
     id: "canon", title: "Canon de Pachelbel", level: "Nivel 4 · Dos manos", tempo: 70,
+    origin: "Johann Pachelbel (1653–1706); fragmento y arreglo del proyecto",
     r: [[78, 2], [76, 2], [74, 2], [73, 2], [71, 2], [69, 2], [71, 2], [73, 2],
       [74, 2], [73, 2], [71, 2], [69, 2], [67, 2], [66, 2], [67, 2], [64, 2], [66, 4]],
     l: [[50, 2], [45, 2], [47, 2], [42, 2], [43, 2], [38, 2], [43, 2], [45, 2],
@@ -82,6 +95,7 @@ export const SONGS: SongDef[] = [
   },
   {
     id: "preludio", title: "Preludio en Do (simplificado)", level: "Nivel 4 · Bach · Dos manos", tempo: 66, px: 60, arpFingering: true,
+    origin: "Johann Sebastian Bach (1685–1750), BWV 846; simplificado por el proyecto",
     r: [...arp(67, 72, 76), ...arp(69, 74, 77), ...arp(67, 74, 77), ...arp(67, 72, 76),
       ...arp(69, 76, 81), ...arp(66, 69, 74), ...arp(67, 74, 79), ...arp(64, 67, 72), [72, 4]],
     l: [[48, 2], [52, 2], [48, 2], [50, 2], [47, 2], [50, 2], [48, 2], [52, 2],
@@ -96,7 +110,8 @@ export const SONGS: SongDef[] = [
 const PRO: SongDef[] = [
   {
     id: "oda-acordes", title: "Himno a la alegría con acordes", level: "Nivel 3 · Beethoven · Acordes", tempo: 76,
-    r: SONGS.find((s) => s.id === "oda")!.n!,
+    origin: "Ludwig van Beethoven (1770–1827); arreglo del proyecto",
+    r: BASE.find((s) => s.id === "oda")!.n!,
     l: [...halves(DO, DO), ...halves(SOL, SOL), ...halves(DO, DO), ...halves(SOL, SOL),
       ...halves(DO, DO), ...halves(SOL, SOL), ...halves(DO, DO), ...halves(SOL, DO)],
   },
@@ -104,6 +119,7 @@ const PRO: SongDef[] = [
     // Wiegenlied, op. 49 n.º 4: la anacrusa se completa con silencio; el bajo se mantiene ligado
     // a través de la barra mientras no cambia la armonía
     id: "cuna", title: "Canción de cuna", level: "Nivel 3 · Brahms · 3/4 · Ligaduras", tempo: 72, bar: 3, px: 60,
+    origin: "Johannes Brahms (1833–1897), op. 49 n.º 4, 1868; arreglo del proyecto",
     r: [[0, 2], [64, 0.5], [64, 0.5],
       [67, 1.5, { slur: "start" }], [64, 0.5], [64, 1, { slur: "end" }], [67, 2], [64, 0.5], [67, 0.5],
       [72, 1, { slur: "start" }], [71, 1.5], [69, 0.5, { slur: "end" }], [69, 1], [67, 1], [62, 0.5], [64, 0.5],
@@ -119,6 +135,7 @@ const PRO: SongDef[] = [
     // popular inglesa (s. XVI), en La menor; la anacrusa se completa con silencio.
     // Tempo en negras con puntillo por minuto (dos pulsos por compás)
     id: "greensleeves", title: "Greensleeves", level: "Nivel 4 · Popular inglesa · 6/8", tempo: 50, time: "6/8",
+    origin: "Popular inglesa, s. XVI; arreglo del proyecto",
     r: [[0, 2.5], [69, 0.5],
       [72, 1], [74, 0.5], [76, 0.75], [77, 0.25], [76, 0.5],
       [74, 1], [71, 0.5], [67, 0.75], [69, 0.25], [71, 0.5],
@@ -132,6 +149,29 @@ const PRO: SongDef[] = [
   },
 ];
 
-SONGS.push(...PRO);
+/**
+ * Orden del repertorio: por nivel y, dentro de cada nivel, de menor a mayor dificultad (008).
+ * La pantalla de Canciones agrupa por nivel conservando este orden. La primera es la pieza
+ * que Inicio propone a quien empieza.
+ */
+export const ORDER: readonly string[] = [
+  // Nivel 1
+  "cinco", "corderito", "hanschen", "santos", "oda", "jingle",
+  // Nivel 2
+  "estrellita", "bollos", "macdonald", "puente", "luna", "martinillo", "susana",
+  // Nivel 3
+  "pregunta", "oda2", "largo", "oda-acordes", "despedida", "nochedepaz", "cuna", "minueto", "elisa",
+  // Nivel 4
+  "estrellita2", "martinillo-canon", "canon", "rema", "preludio", "elisa2", "greensleeves",
+];
+
+const ALL = [...BASE, ...PRO, ...MORE];
+const byId = new Map(ALL.map((s) => [s.id, s]));
+if (byId.size !== ALL.length || ORDER.length !== ALL.length || ORDER.some((id) => !byId.has(id))) {
+  throw new Error("ORDER y el repertorio no coinciden");
+}
+
+/** Repertorio incluido, en el orden de ORDER. */
+export const SONGS: SongDef[] = ORDER.map((id) => byId.get(id)!);
 
 export const DEFAULT_SONG_ID = "oda2";
