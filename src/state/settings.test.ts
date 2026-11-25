@@ -29,3 +29,18 @@ describe("ajuste Aprender a tempo", () => {
     expect((await loadSettings()).get().learnAtTempo).toBe(true);
   });
 });
+
+describe("explicación del pedal (009)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sale una vez: por defecto no vista, también con ajustes antiguos", async () => {
+    vi.stubGlobal("localStorage", fakeStorage({ "tecla-settings": JSON.stringify({ notation: "latin", learnAtTempo: true }) }));
+    expect((await loadSettings()).get().pedalHelpSeen).toBe(false);
+  });
+
+  it("al cerrarla se recuerda", async () => {
+    vi.stubGlobal("localStorage", fakeStorage());
+    (await loadSettings()).set({ pedalHelpSeen: true });
+    expect((await loadSettings()).get().pedalHelpSeen).toBe(true);
+  });
+});

@@ -3,6 +3,7 @@ import { addImported, editImported, ensureFull, findByHash, imported, removeImpo
 import { allSongs, findSong, repertoireStars, resolveSongId } from "./library";
 import { progress, recordStars } from "./progress";
 import type { FullCheck, Proposal, RawPiece } from "../music/import/types";
+import { buildScore } from "../music/score";
 
 const proposal: Proposal = {
   song: { title: "Original", tempo: 90, px: 50, n: [[60, 4]] },
@@ -204,5 +205,24 @@ describe("versión completa (007, historia 5)", () => {
     expect(progress.get().best).toEqual({});
     expect(progress.get().last).toBeNull();
     expect(deps.deleteOriginal).toHaveBeenCalledWith("imp-0123abcd");
+  });
+});
+
+describe("pedal en piezas importadas (009)", () => {
+  const withPedal: Proposal = { ...proposal, song: { title: "Con pedal", tempo: 90, px: 50, n: [[60, 2], [62, 2]], pedal: [[0, 2], [2, 4]] } };
+
+  it("se guarda con la pieza y se conserva al editar su nivel; solo se usa desde el nivel 3", async () => {
+    const res = await addImported(withPedal, meta, bytes, { title: "P", level: 3 }, fakeDeps());
+    if (!res.ok) throw new Error("no se guardó");
+    const def = () => imported.get().songs[0].def;
+    expect(def().pedal).toEqual([[0, 2], [2, 4]]);
+    expect(buildScore(def()).pedals).toEqual([[0, 2], [2, 4]]);
+
+    expect(editImported(res.id, { level: 2 })).toBe(true);
+    expect(def().pedal).toEqual([[0, 2], [2, 4]]);
+    expect(buildScore(def()).pedals).toEqual([]);
+
+    editImported(res.id, { level: 3 });
+    expect(buildScore(def()).pedals).toEqual([[0, 2], [2, 4]]);
   });
 });

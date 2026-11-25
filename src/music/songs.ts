@@ -1,5 +1,6 @@
 import type { RawTrack, SongDef, Track } from "./types";
 import { MORE } from "./repertoire";
+import { chain, every } from "./pedal";
 
 /** Arpegio de tres notas en corcheas, subiendo y bajando dos veces (un compás de 4/4). */
 const arp = (a: number, b: number, c: number): RawTrack => [a, b, c, b, a, b, c, b].map((m) => [m, 0.5] as [number, number]);
@@ -69,14 +70,16 @@ const BASE: SongDef[] = [
     l: [[0, 8], [48, 1], [50, 1], [52, 1], [53, 1], [55, 4], [48, 2], [55, 2], [48, 4]],
   },
   {
-    id: "oda2", title: "Himno a la alegría a dos manos", level: "Nivel 3 · Dos manos", tempo: 80,
+    id: "oda2", title: "Himno a la alegría a dos manos", level: "Nivel 3 · Dos manos · Pedal", tempo: 80,
     origin: "Ludwig van Beethoven (1770–1827); arreglo del proyecto",
     r: [[64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1], [60, 1], [60, 1], [62, 1], [64, 1], [64, 1.5], [62, 0.5], [62, 2],
       [64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1], [60, 1], [60, 1], [62, 1], [64, 1], [62, 1.5], [60, 0.5], [60, 2]],
     l: [[48, 4], [55, 4], [48, 4], [55, 4], [48, 4], [55, 4], [48, 4], [55, 2], [48, 2]],
+    // un tramo por bajo de la izquierda
+    pedal: chain(0, 4, 8, 12, 16, 20, 24, 28, 30, 32),
   },
   {
-    id: "estrellita2", title: "Estrellita a dos manos", level: "Nivel 4 · Dos manos", tempo: 85,
+    id: "estrellita2", title: "Estrellita a dos manos", level: "Nivel 4 · Dos manos · Pedal", tempo: 85,
     origin: "Popular francesa, s. XVIII; arreglo del proyecto",
     r: [[60, 1], [60, 1], [67, 1], [67, 1], [69, 1], [69, 1], [67, 2], [65, 1], [65, 1], [64, 1], [64, 1], [62, 1], [62, 1], [60, 2],
       [67, 1], [67, 1], [65, 1], [65, 1], [64, 1], [64, 1], [62, 2], [67, 1], [67, 1], [65, 1], [65, 1], [64, 1], [64, 1], [62, 2],
@@ -84,22 +87,28 @@ const BASE: SongDef[] = [
     l: [[48, 4], [53, 2], [48, 2], [53, 2], [48, 2], [55, 2], [48, 2],
       [48, 2], [53, 2], [48, 2], [55, 2], [48, 2], [53, 2], [48, 2], [55, 2],
       [48, 4], [53, 2], [48, 2], [53, 2], [48, 2], [55, 2], [48, 2]],
+    // un tramo por bajo de la izquierda
+    pedal: [...chain(0, 4), ...every(2, 4, 32), ...chain(32, 36), ...every(2, 36, 48)],
   },
   {
-    id: "canon", title: "Canon de Pachelbel", level: "Nivel 4 · Dos manos", tempo: 70,
+    id: "canon", title: "Canon de Pachelbel", level: "Nivel 4 · Dos manos · Pedal", tempo: 70,
     origin: "Johann Pachelbel (1653–1706); fragmento y arreglo del proyecto",
     r: [[78, 2], [76, 2], [74, 2], [73, 2], [71, 2], [69, 2], [71, 2], [73, 2],
       [74, 2], [73, 2], [71, 2], [69, 2], [67, 2], [66, 2], [67, 2], [64, 2], [66, 4]],
     l: [[50, 2], [45, 2], [47, 2], [42, 2], [43, 2], [38, 2], [43, 2], [45, 2],
       [50, 2], [45, 2], [47, 2], [42, 2], [43, 2], [38, 2], [43, 2], [45, 2], [38, 4]],
+    // cambio con cada nota del bajo
+    pedal: [...every(2, 0, 32), ...chain(32, 36)],
   },
   {
-    id: "preludio", title: "Preludio en Do (simplificado)", level: "Nivel 4 · Bach · Dos manos", tempo: 66, px: 60, arpFingering: true,
+    id: "preludio", title: "Preludio en Do (simplificado)", level: "Nivel 4 · Bach · Dos manos · Pedal", tempo: 66, px: 60, arpFingering: true,
     origin: "Johann Sebastian Bach (1685–1750), BWV 846; simplificado por el proyecto",
     r: [...arp(67, 72, 76), ...arp(69, 74, 77), ...arp(67, 74, 77), ...arp(67, 72, 76),
       ...arp(69, 76, 81), ...arp(66, 69, 74), ...arp(67, 74, 79), ...arp(64, 67, 72), [72, 4]],
     l: [[48, 2], [52, 2], [48, 2], [50, 2], [47, 2], [50, 2], [48, 2], [52, 2],
       [48, 2], [52, 2], [48, 2], [50, 2], [47, 2], [50, 2], [47, 2], [48, 2], [48, 4]],
+    // un tramo por compás: cada compás es un acorde arpegiado
+    pedal: every(4, 0, 36),
   },
 ];
 
@@ -109,16 +118,18 @@ const BASE: SongDef[] = [
  */
 const PRO: SongDef[] = [
   {
-    id: "oda-acordes", title: "Himno a la alegría con acordes", level: "Nivel 3 · Beethoven · Acordes", tempo: 76,
+    id: "oda-acordes", title: "Himno a la alegría con acordes", level: "Nivel 3 · Beethoven · Acordes · Pedal", tempo: 76,
     origin: "Ludwig van Beethoven (1770–1827); arreglo del proyecto",
     r: BASE.find((s) => s.id === "oda")!.n!,
     l: [...halves(DO, DO), ...halves(SOL, SOL), ...halves(DO, DO), ...halves(SOL, SOL),
       ...halves(DO, DO), ...halves(SOL, SOL), ...halves(DO, DO), ...halves(SOL, DO)],
+    // un tramo por acorde distinto: por compás, y al final Sol–Do
+    pedal: chain(0, 4, 8, 12, 16, 20, 24, 28, 30, 32),
   },
   {
     // Wiegenlied, op. 49 n.º 4: la anacrusa se completa con silencio; el bajo se mantiene ligado
     // a través de la barra mientras no cambia la armonía
-    id: "cuna", title: "Canción de cuna", level: "Nivel 3 · Brahms · 3/4 · Ligaduras", tempo: 72, bar: 3, px: 60,
+    id: "cuna", title: "Canción de cuna", level: "Nivel 3 · Brahms · 3/4 · Ligaduras · Pedal", tempo: 72, bar: 3, px: 60,
     origin: "Johannes Brahms (1833–1897), op. 49 n.º 4, 1868; arreglo del proyecto",
     r: [[0, 2], [64, 0.5], [64, 0.5],
       [67, 1.5, { slur: "start" }], [64, 0.5], [64, 1, { slur: "end" }], [67, 2], [64, 0.5], [67, 0.5],
@@ -130,11 +141,13 @@ const PRO: SongDef[] = [
       [43, 3, { tie: true }], [43, 3],
       [47, 3, { tie: true }], [47, 3],
       [43, 3], [48, 3]],
+    // un tramo por compás desde que entra la izquierda
+    pedal: every(3, 3, 27),
   },
   {
     // popular inglesa (s. XVI), en La menor; la anacrusa se completa con silencio.
     // Tempo en negras con puntillo por minuto (dos pulsos por compás)
-    id: "greensleeves", title: "Greensleeves", level: "Nivel 4 · Popular inglesa · 6/8", tempo: 50, time: "6/8",
+    id: "greensleeves", title: "Greensleeves", level: "Nivel 4 · Popular inglesa · 6/8 · Pedal", tempo: 50, time: "6/8",
     origin: "Popular inglesa, s. XVI; arreglo del proyecto",
     r: [[0, 2.5], [69, 0.5],
       [72, 1], [74, 0.5], [76, 0.75], [77, 0.25], [76, 0.5],
@@ -146,6 +159,8 @@ const PRO: SongDef[] = [
       [72, 0.75], [71, 0.25], [69, 0.5], [68, 0.75], [66, 0.25], [68, 0.5],
       [69, 3]],
     l: [[0, 3], [45, 3], [43, 3], [45, 3], [40, 3], [45, 3], [43, 3], [45, 1.5], [40, 1.5], [45, 3]],
+    // un tramo por bajo de la izquierda
+    pedal: chain(3, 6, 9, 12, 15, 18, 21, 22.5, 24, 27),
   },
 ];
 

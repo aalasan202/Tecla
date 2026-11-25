@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useRoute } from "./router";
 import { settings } from "./state/settings";
 import { MidiProvider } from "./midi/MidiProvider";
+import { setSustain } from "./audio/synth";
 import { Home } from "./screens/Home";
 import { Songs } from "./screens/Songs";
 import { LessonScreen } from "./screens/LessonScreen";
@@ -48,7 +49,7 @@ export default function App() {
   }
 
   return (
-    <MidiProvider>
+    <MidiProvider onPedal={setSustain}>
       <div className="app">{screen}</div>
       <PwaToast route={route} />
       <div className="rotate">

@@ -1,4 +1,5 @@
 import type { SongDef, Track } from "./types";
+import { chain, every } from "./pedal";
 
 /**
  * Piezas añadidas en 008 (ampliar el repertorio por niveles). Todas de dominio público: música
@@ -117,15 +118,17 @@ export const MORE: SongDef[] = [
   // ---------------- Nivel 3: dos manos con izquierda sencilla, 3/4 ----------------
   {
     // transportado de Re bemol a Do; la izquierda marca la armonía con redondas
-    id: "largo", title: "Largo del Nuevo Mundo", level: "Nivel 3 · Dvořák · Dos manos", tempo: 56,
+    id: "largo", title: "Largo del Nuevo Mundo", level: "Nivel 3 · Dvořák · Dos manos · Pedal", tempo: 56,
     origin: "Antonín Dvořák (1841–1904), Sinfonía n.º 9, 2.º mov., 1893; fragmento y arreglo del proyecto",
     r: [...LARGO_A, [62, 1], [64, 1], [67, 1], [64, 1], [62, 4],
       ...LARGO_A, [62, 1], [64, 1], [62, 1], [60, 1], [60, 4]],
     l: wholes(48, 48, 43, 43, 48, 48, 43, 48),
+    // un tramo por compás
+    pedal: every(4, 0, 32),
   },
   {
     // Auld Lang Syne; la anacrusa se completa con silencio
-    id: "despedida", title: "Canción de la despedida", level: "Nivel 3 · Popular escocesa · Dos manos", tempo: 80,
+    id: "despedida", title: "Canción de la despedida", level: "Nivel 3 · Popular escocesa · Dos manos · Pedal", tempo: 80,
     origin: "Popular escocesa («Auld Lang Syne», letra de R. Burns, 1788); arreglo del proyecto",
     r: [[0, 3], [55, 1],
       [60, 1.5], [60, 0.5], [60, 1], [64, 1], [62, 1.5], [60, 0.5], [62, 1], [64, 1], [60, 1.5], [60, 0.5], [64, 1], [67, 1], [69, 3], [69, 1],
@@ -135,10 +138,12 @@ export const MORE: SongDef[] = [
     l: [[0, 4],
       [48, 4], [43, 4], [48, 4], [41, 4], [48, 4], [43, 4], [41, 2], [43, 2], [48, 4],
       [48, 4], [43, 2], [41, 2], [48, 4], [41, 4], [48, 4], [43, 4], [41, 2], [43, 2], [48, 3], [0, 1]],
+    // un tramo por bajo de la izquierda; el último se mantiene hasta el final
+    pedal: chain(4, 8, 12, 16, 20, 24, 28, 30, 32, 36, 40, 42, 44, 48, 52, 56, 60, 62, 64, 68),
   },
   {
     // la izquierda mantiene la nota del acorde; el final se liga a través de la barra
-    id: "nochedepaz", title: "Noche de paz", level: "Nivel 3 · Gruber · 3/4 · Dos manos", tempo: 66, bar: 3, px: 60,
+    id: "nochedepaz", title: "Noche de paz", level: "Nivel 3 · Gruber · 3/4 · Dos manos · Pedal", tempo: 66, bar: 3, px: 60,
     origin: "Franz Xaver Gruber (1787–1863), «Stille Nacht», 1818; arreglo del proyecto",
     r: [...NOCHE_A, ...NOCHE_A, [74, 2], [74, 1], [71, 3], [72, 2], [72, 1], [67, 3],
       ...NOCHE_B, ...NOCHE_A, ...NOCHE_B, ...NOCHE_A,
@@ -147,6 +152,8 @@ export const MORE: SongDef[] = [
     l: [[48, 3], [48, 3], [48, 3], [48, 3], [43, 3], [43, 3], [48, 3], [48, 3],
       [41, 3], [41, 3], [48, 3], [48, 3], [41, 3], [41, 3], [48, 3], [48, 3],
       [43, 3], [43, 3], [48, 3], [48, 3], [48, 3], [43, 3], [48, 3, { tie: true }], [48, 3]],
+    // un tramo por compás; los dos últimos compases (nota ligada) en un solo tramo
+    pedal: [...every(3, 0, 66), ...chain(66, 72)],
   },
 
   // ---------------- Nivel 4: independencia de manos ----------------
@@ -166,7 +173,7 @@ export const MORE: SongDef[] = [
   },
   {
     // los arpegios de la izquierda se alternan con la derecha, como en el original (3/8 escrito en 3/4)
-    id: "elisa2", title: "Para Elisa a dos manos", level: "Nivel 4 · Beethoven · Arpegios", tempo: 66, bar: 3, px: 64,
+    id: "elisa2", title: "Para Elisa a dos manos", level: "Nivel 4 · Beethoven · Arpegios · Pedal", tempo: 66, bar: 3, px: 64,
     origin: "Ludwig van Beethoven (1770–1827), WoO 59, 1810; fragmento",
     r: [[0, 2], [76, 0.5], [75, 0.5],
       ...E_TURN, [69, 1], [0, 0.5], [60, 0.5], [64, 0.5], [69, 0.5],
@@ -174,5 +181,7 @@ export const MORE: SongDef[] = [
       ...E_TURN, [69, 1], [0, 0.5], [60, 0.5], [64, 0.5], [69, 0.5],
       [71, 1], [0, 0.5], [64, 0.5], [72, 0.5], [71, 0.5], [69, 3]],
     l: [[0, 6], ...L_A, [0, 1.5], ...L_E, [0, 1.5], ...L_A, [0, 4.5], ...L_A, [0, 1.5], ...L_E, [0, 1.5], [45, 0.5], [52, 0.5], [57, 2]],
+    // un tramo por compás con arpegio de la izquierda; el giro Mi–Re♯ va sin pedal
+    pedal: [...chain(6, 9, 12, 15), ...chain(18, 21, 24, 27)],
   },
 ];

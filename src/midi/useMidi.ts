@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { parseMidiMessage } from "./message";
 
 export type MidiStatus = "idle" | "ok" | "none" | "blocked" | "unsupported";
 
@@ -8,23 +9,31 @@ export interface MidiState {
   connect: () => void;
 }
 
-/** Conecta con los teclados MIDI del navegador y llama a onNoteOn con cada nota pulsada. */
-export function useMidi(onNoteOn: (note: number, velocity: number) => void): MidiState {
+/**
+ * Conecta con los teclados MIDI del navegador y llama a onNoteOn con cada nota pulsada, y a
+ * onPedal con el pedal de resonancia (009). Al cambiar los dispositivos, el pedal se suelta.
+ */
+export function useMidi(onNoteOn: (note: number, velocity: number) => void, onPedal?: (down: boolean) => void): MidiState {
   const [status, setStatus] = useState<MidiStatus>("idle");
   const [devices, setDevices] = useState<string[]>([]);
   const handler = useRef(onNoteOn);
   handler.current = onNoteOn;
+  const pedal = useRef(onPedal);
+  pedal.current = onPedal;
   const access = useRef<MIDIAccess | null>(null);
 
   const bind = useCallback((acc: MIDIAccess) => {
     const names: string[] = [];
+    // un teclado desconectado con el pedal pisado no debe dejar notas sonando
+    pedal.current?.(false);
     acc.inputs.forEach((input) => {
       if (input.state === "disconnected") return;
       names.push(input.name || "Teclado MIDI");
       input.onmidimessage = (ev) => {
         if (!ev.data) return;
-        const [st, note, vel] = ev.data;
-        if ((st & 0xf0) === 0x90 && vel > 0) handler.current(note, vel);
+        const msg = parseMidiMessage(ev.data);
+        if (msg?.type === "note") handler.current(msg.note, msg.velocity);
+        else if (msg?.type === "pedal") pedal.current?.(msg.down);
       };
     });
     setDevices(names);

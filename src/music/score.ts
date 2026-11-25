@@ -2,6 +2,7 @@ import type { EventOpts, Hand, KeyChange, Rest, Score, ScoreNote, SongDef, Spell
 import { assignFingering, eventsOf } from "./fingering";
 import { layoutScore } from "./layout";
 import { accidentals, keyAt, spell } from "./spelling";
+import { levelOf } from "./level";
 
 /** Ticks por negra: divisible por 2, 3, 4, 8, 12 y 16 (research R3). */
 export const TICKS = 48;
@@ -124,7 +125,9 @@ export function buildScore(song: SongDef): Score {
   const layout = layoutScore({ bar, total, onsets: [...notes.map((n) => n.s), ...rests.map((r) => r.s)], px: song.px, keys, accFirst });
   for (const n of notes) n.x = layout.xAt(n.s);
 
-  return { song, notes, rests, total, bar, px: layout.px, pulse, time, keys, twoHands, layout };
+  // el pedal solo se usa desde el nivel 3 (009, research R3)
+  const pedals = levelOf(song) >= 3 ? (song.pedal ?? []).map(([a, b]): [number, number] => [a, b]) : [];
+  return { song, notes, rests, total, bar, px: layout.px, pulse, time, keys, twoHands, layout, pedals };
 }
 
 /**

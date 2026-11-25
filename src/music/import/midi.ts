@@ -5,6 +5,8 @@ export type MidiEvent =
   | { tick: number; type: "on"; channel: number; note: number; velocity: number }
   | { tick: number; type: "off"; channel: number; note: number }
   | { tick: number; type: "program"; channel: number; program: number }
+  /** Pedal de resonancia (CC 64): pisado con valor ≥ 64 (009). */
+  | { tick: number; type: "pedal"; channel: number; down: boolean }
   | { tick: number; type: "tempo"; usPerQuarter: number }
   | { tick: number; type: "time"; beats: number; beatType: number }
   | { tick: number; type: "key"; key: number }
@@ -126,6 +128,7 @@ function readTrack(r: Reader): MidiTrack {
     if (kind === 0x90 && b > 0) track.events.push({ tick, type: "on", channel, note: a, velocity: b });
     else if (kind === 0x80 || kind === 0x90) track.events.push({ tick, type: "off", channel, note: a });
     else if (kind === 0xc0) track.events.push({ tick, type: "program", channel, program: a });
+    else if (kind === 0xb0 && a === 64) track.events.push({ tick, type: "pedal", channel, down: b >= 64 });
   }
   return track;
 }
@@ -216,7 +219,24 @@ export function midiToRaw(midi: MidiFile, fileName: string): RawPiece {
     .sort((a, b) => a.at - b.at);
   const title = midi.tracks[0]?.name?.trim();
 
+  // pedal (009): pisar y levantar por orden de tick; un pisado repetido no abre otro tramo y uno
+  // sin levantar dura hasta el final
+  const pedal: [number, number][] = [];
+  let down: number | null = null;
+  const pedals = all.flatMap((e, i) => (e.type === "pedal" ? [{ e, i }] : [])).sort((a, b) => a.e.tick - b.e.tick || a.i - b.i);
+  for (const { e } of pedals) {
+    if (e.type !== "pedal") continue;
+    if (e.down && down === null) down = e.tick;
+    else if (!e.down && down !== null) {
+      if (e.tick > down) pedal.push([down / q, e.tick / q]);
+      down = null;
+    }
+  }
+  const lastTick = all.reduce((a, e) => Math.max(a, e.tick), 0);
+  if (down !== null && lastTick > down) pedal.push([down / q, lastTick / q]);
+
   return {
+    ...(pedal.length ? { pedal } : {}),
     format: "midi",
     title: title || stripExt(fileName),
     tempo: tempoEvent && tempoEvent.type === "tempo" ? 60_000_000 / tempoEvent.usPerQuarter : 120,

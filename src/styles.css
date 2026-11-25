@@ -289,6 +289,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .n.auto .fg { opacity: 0.4; }
 /* partitura dibujada con VexFlow (ScoreView): colores del tema sobre los atributos de VexFlow */
 .score-loading { display: grid; place-items: center; min-height: 150px; color: var(--muted); font-size: 15px; }
+.pedal { fill: none; stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
+.pedal-help { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.pedal-help h2 { font-size: 16px; flex-basis: 100%; }
+.pedal-help .hint { flex: 1 1 280px; margin: 0; }
 .vfl { color: var(--ink); }
 .vfl [fill]:not([fill="none"]) { fill: currentColor; }
 .vfl [stroke]:not([stroke="none"]) { stroke: currentColor; }

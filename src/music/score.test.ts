@@ -270,3 +270,18 @@ describe("ritmo: 6/8, semicorcheas y tresillos (historia 6)", () => {
     expect(score.notes[1].win.hit).toBeCloseTo(1 / 6);
   });
 });
+
+describe("pedal (009)", () => {
+  const song = (level: string): SongDef => ({ id: "t", title: "t", level, tempo: 80, n: [[60, 2], [62, 2], [64, 4]], pedal: [[0, 2], [2, 4]] });
+
+  it("validateSong rechaza tramos solapados", () => {
+    expect(validateSong({ ...song("Nivel 3"), pedal: [[0, 4], [2, 4]] }).join()).toMatch(/solapa/);
+    expect(validateSong(song("Nivel 3"))).toEqual([]);
+  });
+
+  it("buildScore solo usa el pedal desde el nivel 3", () => {
+    expect(buildScore(song("Nivel 2 · Importada de MIDI")).pedals).toEqual([]);
+    expect(buildScore(song("Nivel 3 · Importada de MIDI")).pedals).toEqual([[0, 2], [2, 4]]);
+    expect(buildScore(song("Nivel 4 · Bach")).pedals).toEqual([[0, 2], [2, 4]]);
+  });
+});

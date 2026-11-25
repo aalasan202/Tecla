@@ -29,6 +29,8 @@ export interface RawPiece {
   /** Armaduras (−7…7) con su pulso de inicio; vacío = Do mayor. */
   keys?: { at: number; key: number }[];
   parts: RawPart[];
+  /** Tramos de pedal leídos del archivo, en pulsos de negra sin cuantizar (009). */
+  pedal?: [number, number][];
   notPiano: boolean;
   ignored: { grace: number; cue: number };
 }

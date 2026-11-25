@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SONGS } from "../music/songs";
 import { convertPiece } from "../music/import/convert";
 import { ImportError } from "../music/import/errors";
-import { DOS_CUARTOS, PRUEBA_COMPLETA, songToMusicXml, twoVoicesXml } from "../music/import/fixtures";
+import { DOS_CUARTOS, PRUEBA_COMPLETA, pedalXml, songToMusicXml, twoVoicesXml } from "../music/import/fixtures";
 import { convertFull } from "../music/import/full";
 import { buildScore } from "../music/score";
 import type { SongDef } from "../music/types";
@@ -197,5 +197,29 @@ describe("versión completa desde MusicXML (007)", () => {
       expect(played({ ...c.song, id: "x", level: "" })).toEqual(played(s));
       expect(c.song.time).toBe(s.time);
     }
+  });
+});
+
+describe("pedal (009)", () => {
+  const pedalOf = (xml: string) => parseMusicXml(xml, "p.musicxml").pedal;
+
+  it("start, change y stop dan tramos encadenados", () => {
+    expect(pedalOf(pedalXml([[0, "start"], [4, "change"], [8, "stop"]]))).toEqual([[0, 4], [4, 8]]);
+  });
+
+  it("<sound damper-pedal> equivale a pisar y levantar", () => {
+    expect(pedalOf(pedalXml([[0, "start"], [2, "stop"], [4, "start"], [8, "stop"]], { damper: true }))).toEqual([[0, 2], [4, 8]]);
+  });
+
+  it("resume abre y discontinue cierra; continue y sostenuto se ignoran", () => {
+    expect(pedalOf(pedalXml([[0, "resume"], [2, "continue"], [3, "sostenuto"], [4, "discontinue"]]))).toEqual([[0, 4]]);
+  });
+
+  it("un tramo incoherente no hace fallar la lectura: stop sin start se ignora y start sin stop se cierra al final", () => {
+    expect(pedalOf(pedalXml([[1, "stop"], [2, "start"]]))).toEqual([[2, 8]]);
+  });
+
+  it("sin pedal, no hay campo pedal", () => {
+    expect(pedalOf(songToMusicXml(SONGS.find((s) => s.id === "oda2")!))).toBeUndefined();
   });
 });

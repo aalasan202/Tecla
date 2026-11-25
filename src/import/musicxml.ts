@@ -16,6 +16,24 @@ const num = (el: Element | undefined, name: string) => {
 };
 const stripExt = (name: string) => name.replace(/\.[^.]*$/, "");
 
+/**
+ * Tramos de pedal a partir de las marcas en orden: «levantar» sin pisar antes se ignora, un
+ * pisado repetido no abre otro tramo y uno sin levantar se cierra en `end` (009).
+ */
+function pedalSpans(marks: { at: number; on: boolean }[], end: number): [number, number][] {
+  const out: [number, number][] = [];
+  let down: number | null = null;
+  for (const { at, on } of marks) {
+    if (on && down === null) down = at;
+    else if (!on && down !== null) {
+      if (at > down) out.push([down, at]);
+      down = null;
+    }
+  }
+  if (down !== null && end > down) out.push([down, end]);
+  return out;
+}
+
 interface Open {
   note: RawNote;
   staff: number;
@@ -47,6 +65,7 @@ export function parseMusicXml(source: string, fileName: string): RawPiece {
     let divisions = 1;
     let measureStart = 0;
     let unpitched = false;
+    const pedalMarks: { at: number; on: boolean }[] = [];
 
     kids(part, "measure").forEach((measure, index) => {
       let pos = measureStart;
@@ -81,6 +100,17 @@ export function parseMusicXml(source: string, fileName: string): RawPiece {
               const perMinute = num(metronome, "per-minute");
               if (perMinute > 0) piece.tempo = perMinute * unit * dotted;
             }
+            // pedal de resonancia (009): <pedal type> o <sound damper-pedal>, en la posición actual
+            const offset = num(el, "offset");
+            const at = pos + (Number.isFinite(offset) ? offset / divisions : 0);
+            for (const p of el.getElementsByTagName("pedal")) {
+              const type = p.getAttribute("type");
+              if (type === "start" || type === "resume") pedalMarks.push({ at, on: true });
+              else if (type === "stop" || type === "discontinue") pedalMarks.push({ at, on: false });
+              else if (type === "change") pedalMarks.push({ at, on: false }, { at, on: true });
+            }
+            const damper = sound?.getAttribute("damper-pedal");
+            if (damper) pedalMarks.push({ at, on: damper === "yes" || Number(damper) > 0 });
             break;
           }
           case "backup":
@@ -142,6 +172,7 @@ export function parseMusicXml(source: string, fileName: string): RawPiece {
       if (index === 0 && barLength > 0 && barLength < full - 1e-6 && measure.getAttribute("implicit") === "yes") {
         const shift = full - barLength;
         for (const notes of staves.values()) for (const n of notes) n.start += shift;
+        for (const p of pedalMarks) p.at += shift;
         barLength = full;
       }
       measureStart += barLength;
@@ -154,6 +185,8 @@ export function parseMusicXml(source: string, fileName: string): RawPiece {
       .map(([staff, notes]): RawPart => ({ staff: staff === 1 ? 1 : 2, notes: notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch) }));
     if (parts.length) {
       partsWithNotes.push(parts);
+      const pedal = pedalSpans(pedalMarks, measureStart);
+      if (pedal.length) piece.pedal = pedal;
       const program = programs.get(id);
       if (unpitched || (program !== undefined && (program < 1 || program > 8))) piece.notPiano = true;
     }

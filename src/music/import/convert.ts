@@ -1,5 +1,6 @@
 import type { RawTrack, SongDef } from "../types";
 import { measure, suggestLevel } from "./level";
+import { fitPedals } from "../pedal";
 import type { ImportCheck, RawNote, RawPart, RawPiece, Warning, WarningKind } from "./types";
 
 /** Duraciones de nota que dibuja la partitura, en pulsos de negra. */
@@ -129,6 +130,15 @@ export function splitHands(parts: RawPart[]): { right: RawNote[]; left: RawNote[
 }
 
 /** Comprueba y convierte una pieza leída en una propuesta de SongDef. Nunca lanza. */
+/**
+ * Pedal del archivo ajustado a las notas ya convertidas (009). Si no queda ningún tramo, la
+ * pieza no lleva `pedal`. Si se ve o no lo decide su nivel, al construir la partitura.
+ */
+export function addPedal(song: Omit<SongDef, "id" | "level">, raw: RawPiece): void {
+  const pedal = raw.pedal ? fitPedals(raw.pedal, song) : [];
+  if (pedal.length) song.pedal = pedal;
+}
+
 export function convertPiece(raw: RawPiece): ImportCheck {
   try {
     return convert(raw);
@@ -184,6 +194,7 @@ function convert(raw: RawPiece): ImportCheck {
   if (touched.size > bars / 2) mark(marks, "farFromOriginal");
   const warnings: Warning[] = ORDER.filter((k) => marks.has(k)).map((kind) => ({ kind, bars: uniqSorted(marks.get(kind)!) }));
 
+  addPedal(song, raw);
   const metrics = measure(song);
   return {
     ok: true,

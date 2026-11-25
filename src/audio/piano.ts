@@ -111,11 +111,24 @@ export function decodePiano(ctx: AudioContext): void {
     .catch(fail);
 }
 
-/** Toca la nota `m` con el piano durante `seconds` y la apaga de forma gradual. */
-export function playPiano(ctx: AudioContext, out: AudioNode, m: number, seconds: number, volume: number): void {
+/** Lo que synth.ts necesita para apagar una nota antes de tiempo (009). */
+export interface Sounding {
+  gain: AudioParam;
+  /** Para la fuente en el instante dado (se puede adelantar). */
+  stop(at: number): void;
+  /** Avisa cuando la nota deja de sonar. */
+  onEnd(cb: () => void): void;
+}
+
+/**
+ * Toca la nota `m` con el piano durante `seconds` y la apaga de forma gradual. Con `hold`
+ * (pedal del teclado MIDI) la deja sonar hasta `holdSeconds`; synth.ts la apaga al soltarlo.
+ */
+export function playPiano(ctx: AudioContext, out: AudioNode, m: number, seconds: number, volume: number, holdSeconds?: number): Sounding | null {
   const sample = sampleFor(m);
   const buffer = buffers.get(sample.midi);
-  if (!buffer) return;
+  if (!buffer) return null;
+  const length = holdSeconds ?? seconds;
   const t = ctx.currentTime;
 
   // como el apagador de un piano: repetir una nota apaga la anterior
@@ -135,16 +148,29 @@ export function playPiano(ctx: AudioContext, out: AudioNode, m: number, seconds:
   src.playbackRate.value = playbackRate(m, sample.midi);
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(volume * PIANO_GAIN, t);
-  gain.gain.setTargetAtTime(0, t + seconds, RELEASE);
+  gain.gain.setTargetAtTime(0, t + length, RELEASE);
   src.connect(gain);
   gain.connect(out);
   src.start(t);
-  src.stop(t + seconds + RELEASE * 5);
+  src.stop(t + length + RELEASE * 5);
 
   const voice: Voice = { src, gain };
   voices.set(m, voice);
+  const ended: (() => void)[] = [];
   src.onended = () => {
     if (voices.get(m) === voice) voices.delete(m);
     gain.disconnect();
+    ended.forEach((cb) => cb());
+  };
+  return {
+    gain: gain.gain,
+    stop: (at) => {
+      try {
+        src.stop(at);
+      } catch {
+        /* ya parada */
+      }
+    },
+    onEnd: (cb) => void ended.push(cb),
   };
 }

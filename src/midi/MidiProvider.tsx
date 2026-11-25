@@ -9,10 +9,18 @@ interface MidiContextValue extends MidiState {
 
 const MidiContext = createContext<MidiContextValue | null>(null);
 
-/** Una sola conexión MIDI para toda la app; cada pantalla recibe las notas mientras está abierta. */
-export function MidiProvider({ children }: { children: ReactNode }) {
+/**
+ * Una sola conexión MIDI para toda la app; cada pantalla recibe las notas mientras está abierta.
+ * El pedal de resonancia va a `onPedal` (el audio), nunca a la lección: no puntúa (009).
+ */
+export function MidiProvider({ children, onPedal }: { children: ReactNode; onPedal?: (down: boolean) => void }) {
   const handler = useRef<Handler | null>(null);
-  const midi = useMidi((n, v) => handler.current?.(n, v));
+  const pedal = useRef(onPedal);
+  pedal.current = onPedal;
+  const midi = useMidi(
+    (n, v) => handler.current?.(n, v),
+    (down) => pedal.current?.(down),
+  );
   const setHandler = useCallback((h: Handler | null) => {
     handler.current = h;
   }, []);

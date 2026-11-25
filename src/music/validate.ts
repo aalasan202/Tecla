@@ -1,5 +1,6 @@
 import type { SongDef } from "./types";
 import { TICKS, meterOf, pitchesOf, tracksOf } from "./score";
+import { validatePedal } from "./pedal";
 
 /**
  * Comprueba una pieza con las reglas del modelo de datos (FR-017). Devuelve la lista de errores,
@@ -59,6 +60,7 @@ export function validateSong(song: SongDef): string[] {
     if (c.at < 0 || c.at >= total) errors.push(`keyChanges con at fuera de la pieza: ${c.at}`);
     prevAt = c.at;
   }
+  errors.push(...validatePedal(song));
   return errors;
 }
 

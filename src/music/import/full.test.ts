@@ -4,7 +4,7 @@ import { buildScore } from "../score";
 import type { SongDef } from "../types";
 import { validateSong } from "../validate";
 import { convertFull } from "./full";
-import { PRUEBA_COMPLETA, songToMidi } from "./fixtures";
+import { PRUEBA_COMPLETA, pedalMidi, songToMidi } from "./fixtures";
 import { midiToRaw, parseMidi } from "./midi";
 import type { FullCheck, RawNote, RawPiece } from "./types";
 
@@ -83,5 +83,21 @@ describe("convertFull (007, historia 5)", () => {
     const c = ok(convertFull(raw([note(60, 0, 4), note(62, 4, 4), note(64, 8, 4)], { keys: [{ at: 0, key: 2 }, { at: 4, key: 2 }, { at: 8, key: -1 }] })));
     expect(c.song.key).toBe(2);
     expect(c.song.keyChanges).toEqual([{ at: 2, key: -1 }]);
+  });
+});
+
+describe("pedal (009)", () => {
+  it("la versión completa lleva el pedal ajustado a sus notas y sigue siendo válida", () => {
+    const c = convertFull(midiToRaw(parseMidi(pedalMidi()), "p.mid"));
+    expect(c.ok).toBe(true);
+    if (!c.ok) return;
+    expect(c.song.pedal).toEqual([[0, 4], [4, 8]]);
+    expect(validateSong({ ...c.song, id: "p", level: "Nivel 3" })).toEqual([]);
+  });
+
+  it("pedal incoherente no impide la versión completa", () => {
+    const c = convertFull({ ...midiToRaw(parseMidi(pedalMidi()), "p.mid"), pedal: [[7.9, 2], [-1, 0.2]] });
+    expect(c.ok).toBe(true);
+    expect(c.ok && "pedal" in c.song).toBe(false);
   });
 });

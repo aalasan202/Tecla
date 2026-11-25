@@ -11,6 +11,8 @@ export interface Settings {
   theme: Theme;
   /** Aprender a tempo: la partitura avanza sola y espera la nota pendiente. */
   learnAtTempo: boolean;
+  /** La explicación del pedal de resonancia ya se cerró (009). */
+  pedalHelpSeen: boolean;
 }
 
 export const settings = createStore<Settings>("tecla-settings", {
@@ -19,4 +21,5 @@ export const settings = createStore<Settings>("tecla-settings", {
   showFingers: false,
   theme: "auto",
   learnAtTempo: false,
+  pedalHelpSeen: false,
 });

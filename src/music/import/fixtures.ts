@@ -233,3 +233,56 @@ export const DOS_CUARTOS: SongDef = {
   r: [[67, 0.5], [67, 0.5], [69, 0.5], [67, 0.5], [72, 1], [71, 1], [67, 0.5], [67, 0.5], [69, 0.5], [67, 0.5], [74, 1], [72, 1]],
   l: [[48, 2], [55, 2], [0, 2], [55, 1], [48, 1]],
 };
+
+/**
+ * MIDI de una mano con pedal (009): ocho negras (Do4…Do5) y CC 64 pisado en el pulso 0 (y otra
+ * vez en el 0,5, que debe ignorarse), cambio en el 4 y levantado en el 8.
+ */
+export function pedalMidi(opts: { open?: boolean } = {}): Uint8Array {
+  const ppq = 480;
+  const notes = [60, 62, 64, 65, 67, 69, 71, 72];
+  const events: { at: number; data: number[] }[] = [{ at: 0, data: timeMeta(4) }];
+  notes.forEach((m, i) => {
+    events.push({ at: i * ppq, data: [0x90, m, 90] });
+    events.push({ at: (i + 1) * ppq - 1, data: [0x80, m, 0] });
+  });
+  events.push({ at: 0, data: [0xb0, 64, 127] }, { at: ppq / 2, data: [0xb0, 64, 100] }, { at: 4 * ppq, data: [0xb0, 64, 0] }, { at: 4 * ppq, data: [0xb0, 64, 127] });
+  if (!opts.open) events.push({ at: 8 * ppq, data: [0xb0, 64, 0] });
+  const sorted = events.map((e, i) => ({ ...e, i })).sort((a, b) => a.at - b.at || a.i - b.i);
+  let last = 0;
+  const track: MidiEventSpec[] = sorted.map((e) => {
+    const dt = e.at - last;
+    last = e.at;
+    return { dt, data: e.data };
+  });
+  return writeMidi([track], { format: 0, ppq });
+}
+
+/**
+ * MusicXML de una mano con pedal (009): dos compases de negras y las marcas `pedal` dadas,
+ * cada una antes de la nota del pulso indicado (0–7). `damper` usa `<sound damper-pedal>`.
+ */
+export function pedalXml(marks: [beat: number, type: string][], opts: { damper?: boolean } = {}): string {
+  const steps = ["C", "D", "E", "F", "G", "A", "B", "C"];
+  const dir = (type: string) =>
+    opts.damper
+      ? `<direction><direction-type><words>Ped.</words></direction-type><sound damper-pedal="${type === "stop" ? "no" : "yes"}"/></direction>`
+      : `<direction><direction-type><pedal type="${type}" line="yes"/></direction-type></direction>`;
+  const measure = (k: number) =>
+    `<measure number="${k + 1}">` +
+    (k === 0 ? `<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>` : "") +
+    [0, 1, 2, 3]
+      .map((j) => {
+        const b = k * 4 + j;
+        const before = marks.filter(([at]) => at === b).map(([, t]) => dir(t)).join("");
+        return `${before}<note><pitch><step>${steps[b]}</step><octave>${b === 7 ? 5 : 4}</octave></pitch><duration>1</duration><type>quarter</type></note>`;
+      })
+      .join("") +
+    // marcas al final del compás (pulso 4 u 8)
+    marks.filter(([at]) => at === (k + 1) * 4 && at === 8).map(([, t]) => dir(t)).join("") +
+    `</measure>`;
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n<score-partwise version="4.0"><work><work-title>Pedal</work-title></work>` +
+    `<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list><part id="P1">${measure(0)}${measure(1)}</part></score-partwise>\n`
+  );
+}

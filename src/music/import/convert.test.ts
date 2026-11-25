@@ -3,7 +3,7 @@ import { SONGS } from "../songs";
 import type { SongDef } from "../types";
 import { DURATIONS, convertPiece } from "./convert";
 import { needsFullNotation } from "../validate";
-import { DOS_CUARTOS, songToMidi } from "./fixtures";
+import { DOS_CUARTOS, pedalMidi, songToMidi } from "./fixtures";
 import { midiToRaw, parseMidi } from "./midi";
 import type { ImportCheck, Proposal, RawNote, RawPart, RawPiece } from "./types";
 
@@ -272,5 +272,25 @@ describe("compás de 2/4 (clarificación 2026-11-24)", () => {
     expect(p.song).toMatchObject({ bar: 2, tempo: 100, r: DOS_CUARTOS.r, l: DOS_CUARTOS.l });
     expect(p.warnings).toEqual([]);
     expectValid(p.song);
+  });
+});
+
+describe("pedal (009)", () => {
+  const raw = () => midiToRaw(parseMidi(pedalMidi()), "p.mid");
+
+  it("la versión simplificada lleva el pedal ajustado a sus notas", () => {
+    const c = convertPiece(raw());
+    expect(c.ok && c.proposal.song.pedal).toEqual([[0, 4], [4, 8]]);
+  });
+
+  it("pedal incoherente: se ajusta o se descarta, y la importación sigue siendo válida (SC-007)", () => {
+    const c = convertPiece({ ...raw(), pedal: [[0.1, 3.9], [3, 50], [Number.NaN, 2], [6, 5]] });
+    expect(c.ok).toBe(true);
+    expect(c.ok && c.proposal.song.pedal).toEqual([[0, 8]]);
+  });
+
+  it("si no queda ningún tramo, no hay campo pedal", () => {
+    const c = convertPiece({ ...raw(), pedal: [[0.1, 0.2]] });
+    expect(c.ok && "pedal" in c.proposal.song).toBe(false);
   });
 });

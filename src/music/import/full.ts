@@ -3,7 +3,7 @@ import { buildScore } from "../score";
 import { engrave } from "../engrave";
 import { spell } from "../spelling";
 import { validateSong } from "../validate";
-import { SLACK, clampTempo, meterOfTime, splitHands } from "./convert";
+import { SLACK, addPedal, clampTempo, meterOfTime, splitHands } from "./convert";
 import { suggestFullLevel } from "./level";
 import type { FullCheck, RawNote, RawPiece, Warning, WarningKind } from "./types";
 
@@ -159,6 +159,8 @@ function convert(raw: RawPiece, thirds: boolean): FullCheck {
     ...(keyChanges.length ? { keyChanges } : {}),
     ...(left ? { r: toTrack(right, total, keyAt), l: toTrack(left, total, keyAt) } : { n: toTrack(right, total, keyAt) }),
   };
+
+  addPedal(song, raw);
 
   // que la partitura la pueda escribir: si no (tresillos mezclados con semicorcheas en un pulso),
   // se vuelve a intentar solo con la rejilla de semicorchea

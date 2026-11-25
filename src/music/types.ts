@@ -21,6 +21,9 @@ export type Track = TrackEvent[];
 /** Alias de compatibilidad: las pistas de antes ([nota, pulsos][]) siguen siendo válidas. */
 export type RawTrack = Track;
 
+/** Tramo con el pedal de resonancia pisado: [pulso de inicio, pulso de fin), en negras. */
+export type PedalSpan = [from: number, to: number];
+
 export interface KeyChange {
   /** Compás (base 0) desde el que rige. */
   at: number;
@@ -55,6 +58,8 @@ export interface SongDef {
   /** Mano derecha e izquierda de una pieza a dos manos. */
   r?: Track;
   l?: Track;
+  /** Tramos de pedal de resonancia, ordenados y sin solaparse. Solo se usan desde el nivel 3. */
+  pedal?: PedalSpan[];
 }
 
 /** Cómo se escribe y se nombra una altura: nota (C…B) y alteración (−2…2). */
@@ -130,4 +135,6 @@ export interface Score {
   keys: KeyChange[];
   twoHands: boolean;
   layout: Layout;
+  /** Tramos de pedal en uso: los de la pieza si su nivel es ≥ 3; si no, vacío. */
+  pedals: PedalSpan[];
 }

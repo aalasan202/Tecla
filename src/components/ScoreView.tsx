@@ -4,6 +4,7 @@ import type { NoteMark } from "../engine/lesson";
 import type { Notation } from "../music/theory";
 import { engrave, type Engraving, type Figure } from "../music/engrave";
 import { noteLabel } from "../music/spelling";
+import { clipPedals, pedalMarks } from "../music/pedal";
 import { fitScale } from "../ui/layout";
 import type { StaffHandle, StaffProps } from "./scoreTypes";
 
@@ -48,10 +49,19 @@ const SHARP_KEYS = ["C", "G", "D", "A", "E", "B", "F#", "C#"];
 const FLAT_KEYS = ["C", "F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"];
 const keySpec = (key: number) => (key >= 0 ? SHARP_KEYS[key] : FLAT_KEYS[-key]);
 
+/** Fila del pedal bajo el pentagrama inferior (009): distancia, alto de los ganchos y de la «V». */
+const PEDAL_GAP = 30;
+const PEDAL_HOOK = 8;
+const PEDAL_V = 4;
+/** Sitio que se añade bajo el pentagrama cuando la pieza tiene pedal. */
+const PEDAL_ROOM = 24;
+
 interface Geometry {
   top: number;
   bottom: number;
   height: number;
+  /** y de la línea de pedal (solo con pedal). */
+  pedalRow: number;
   nameRow: { R: number; L: number };
   fingerRow: { R: number; L: number };
 }
@@ -63,13 +73,15 @@ function geometryOf(score: Score): Geometry {
     return Math.max(1, ...sizes.values());
   };
   const bottom = (score.twoHands ? BASS_TOP : TREBLE_TOP) + STAFF_H;
-  const nameR = bottom + 44;
+  // con pedal, los nombres bajan para dejar su fila; sin pedal, la geometría de siempre
+  const nameR = bottom + 44 + (score.pedals.length ? PEDAL_ROOM : 0);
   const nameL = nameR + NAME_GAP * chord("R") + 6;
   const last = score.twoHands ? nameL + NAME_GAP * (chord("L") - 1) : nameR + NAME_GAP * (chord("R") - 1);
   return {
     top: TREBLE_TOP,
     bottom,
     height: last + 16,
+    pedalRow: bottom + PEDAL_GAP,
     nameRow: { R: nameR, L: nameL },
     fingerRow: { R: TREBLE_TOP - 34, L: (TREBLE_TOP + STAFF_H + BASS_TOP) / 2 + 6 },
   };
@@ -265,13 +277,15 @@ export const ScoreView = forwardRef<StaffHandle, StaffProps>(function ScoreView(
 
   const width = layout.width;
   const view = fit && box ? box : { y: 0, h: geo.height };
+  // el resaltado del bucle y el cursor abarcan también la fila del pedal
+  const lowest = score.pedals.length ? Math.max(geo.bottom + 30, geo.pedalRow + 6) : geo.bottom + 30;
   const loopRect = loop && layout.measures[loop.from] && (
     <rect
       className="loop-range"
       x={layout.measures[loop.from].x + 2}
       width={layout.measures.slice(loop.from, (loop.to ?? loop.from) + 1).reduce((a, m) => a + m.width, 0)}
       y={geo.top - 44}
-      height={geo.bottom + 30 - (geo.top - 44)}
+      height={lowest - (geo.top - 44)}
       rx={6}
     />
   );
@@ -319,11 +333,45 @@ export const ScoreView = forwardRef<StaffHandle, StaffProps>(function ScoreView(
                 notation={notation}
               />
             ))}
+          <PedalLine score={score} geo={geo} loop={loop} />
         </g>
-        <line ref={head} x1={0} x2={0} y1={geo.top - 40} y2={geo.bottom + 34} className="playhead" opacity={0} />
+        <line ref={head} x1={0} x2={0} y1={geo.top - 40} y2={lowest + 4} className="playhead" opacity={0} />
       </svg>
     </div>
   );
+});
+
+/**
+ * Línea de pedal (009, research R7–R8): gancho al pisar, «V» en cada cambio y gancho al
+ * levantar, con las x de `layout`, así que es continua aunque VexFlow dibuje por tramos. Con un
+ * bucle completo se recorta al fragmento.
+ */
+const PedalLine = memo(function PedalLine({ score, geo, loop }: { score: Score; geo: Geometry; loop: StaffProps["loop"] }) {
+  const { layout, bar, total } = score;
+  const clip = loop && loop.to !== null && layout.measures[loop.from] && layout.measures[loop.to] ? { from: loop.from * bar, to: (loop.to + 1) * bar, box: layout.measures[loop.to] } : null;
+  const spans = clip ? clipPedals(score.pedals, clip.from, clip.to) : score.pedals;
+  if (!spans.length) return null;
+  const last = layout.measures[layout.measures.length - 1];
+  // al final de la pieza o del fragmento, el gancho cae justo antes de la barra
+  const xOf = (at: number) =>
+    at >= total - 1e-9 ? last.x + last.width - 4 : clip && at >= clip.to - 1e-9 ? clip.box.x + clip.box.width - 4 : layout.xAt(at);
+  const y = geo.pedalRow;
+  const top = y - PEDAL_HOOK;
+  const marks = pedalMarks(spans);
+  const changes = new Set(marks.flatMap((m) => (m.kind === "change" ? [m.at] : [])));
+  const d = marks
+    .map((m) => {
+      if (m.kind === "line") {
+        const x1 = xOf(m.from) + (changes.has(m.from) ? PEDAL_V : 0);
+        const x2 = xOf(m.to) - (changes.has(m.to) ? PEDAL_V : 0);
+        return `M${x1} ${y}H${x2}`;
+      }
+      const x = xOf(m.at);
+      if (m.kind === "change") return `M${x - PEDAL_V} ${y}L${x} ${top}L${x + PEDAL_V} ${y}`;
+      return `M${x} ${top}V${y}`;
+    })
+    .join("");
+  return <path className="pedal" d={d} aria-label="Pedal de resonancia" />;
 });
 
 /** Posición de cada nota en su acorde, desde la más aguda (0) hacia abajo. */

@@ -1,6 +1,7 @@
 import type { Hand, Score, ScoreNote, Spelled } from "../music/types";
 import { noteLabel } from "../music/spelling";
 import { HIT_WINDOW, PERFECT_WINDOW } from "../music/score";
+import { sustainedEnd } from "../music/pedal";
 
 export { HIT_WINDOW, PERFECT_WINDOW };
 
@@ -26,6 +27,8 @@ export interface LessonHost {
   scrollTo(x: number, smooth: boolean): void;
   flash(m: number, kind: KeyFlash, ms?: number): void;
   tone(m: number, seconds: number, volume?: number): void;
+  /** Apaga todo lo que suena (al parar y al empezar cada repetición del bucle). */
+  release?(): void;
   click(strong: boolean): void;
   finish(result: LessonResult): void;
   now(): number;
@@ -181,6 +184,7 @@ export class Lesson {
     this.timers.forEach(clearTimeout);
     this.timers = [];
     this.host.guide([]);
+    this.host.release?.();
   }
 
   /** Una tecla pulsada (pantalla, teclado del ordenador o MIDI). */
@@ -279,7 +283,9 @@ export class Lesson {
   private sound(n: ScoreNote): void {
     // con bucle, nada suena más allá del final del fragmento
     const d = Math.min(n.d, this.end - n.s) * this.spb;
-    this.host.tone(n.m, d * 0.95, n.h === "L" ? 0.26 : 0.32);
+    // el pedal (009) solo alarga el sonido; la tecla se ilumina lo que dura la figura
+    const held = (Math.min(sustainedEnd(n.s, n.d, this.score.pedals), this.end) - n.s) * this.spb;
+    this.host.tone(n.m, held * 0.95, n.h === "L" ? 0.26 : 0.32);
     this.host.flash(n.m, "down", Math.min(d * 900, 700));
   }
 
@@ -309,6 +315,8 @@ export class Lesson {
   /** Bucle: cierra la repetición en curso y deja el fragmento listo para la siguiente. */
   private nextRepetition(): void {
     if (this.mode !== "listen") this.reps.push(this.result());
+    // no se arrastra la resonancia del final del fragmento al principio
+    this.host.release?.();
     this.rep++;
     for (const n of this.score.notes) {
       if (!this.inRange(n)) continue;
@@ -506,6 +514,7 @@ export class Lesson {
     return { reps: this.reps.length, best, last: this.reps[this.reps.length - 1] };
   }
 
+  /** Invariante (009, FR-007): el resultado no depende de `score.pedals`, que solo usa `sound()`. */
   result(): LessonResult {
     if (this.mode === "listen") {
       return { mode: "listen", score: null, stars: 0, message: "Ya conoces cómo suena. Ahora apréndela nota a nota." };

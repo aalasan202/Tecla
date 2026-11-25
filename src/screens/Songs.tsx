@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isImported, useLibrary } from "../state/library";
 import type { SongDef } from "../music/types";
+import { levelOf } from "../music/level";
 import { progress } from "../state/progress";
 import { TopBar } from "../components/TopBar";
 import { hrefFor } from "../router";
@@ -11,7 +12,6 @@ const ACCEPT = ".mid,.midi,.musicxml,.xml,.mxl";
 
 type Filter = "all" | "one" | "two";
 
-export const levelOf = (s: SongDef): number => Number(/Nivel (\d+)/.exec(s.level)?.[1] ?? 1);
 const detailOf = (s: SongDef): string => s.level.split(" · ").slice(1).join(" · ");
 
 const LEVEL_TEXT: Record<number, string> = {

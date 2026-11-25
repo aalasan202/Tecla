@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SONGS } from "../songs";
 import { ImportError } from "./errors";
-import { DOS_CUARTOS, nameMeta, songToMidi, tempoMeta, writeMidi } from "./fixtures";
+import { DOS_CUARTOS, nameMeta, pedalMidi, songToMidi, tempoMeta, writeMidi } from "./fixtures";
 import { midiToRaw, parseMidi } from "./midi";
 
 const byId = (id: string) => SONGS.find((s) => s.id === id)!;
@@ -141,5 +141,26 @@ describe("armadura en MIDI (007)", () => {
 
   it("sin meta de armadura no hay keys", () => {
     expect(midiToRaw(parseMidi(songToMidi(SONGS[0])), "c.mid").keys).toBeUndefined();
+  });
+});
+
+describe("pedal (009)", () => {
+  it("parseMidi emite el pedal de CC 64 con el umbral 64", () => {
+    const events = parseMidi(pedalMidi()).tracks[0].events.filter((e) => e.type === "pedal");
+    expect(events.map((e) => e.type === "pedal" && [e.tick, e.down])).toEqual([[0, true], [240, true], [1920, false], [1920, true], [3840, false]]);
+  });
+
+  it("midiToRaw da los tramos en pulsos e ignora el pisado repetido", () => {
+    expect(midiToRaw(parseMidi(pedalMidi()), "p.mid").pedal).toEqual([[0, 4], [4, 8]]);
+  });
+
+  it("un pisado sin levantar dura hasta el final de la pista", () => {
+    const raw = midiToRaw(parseMidi(pedalMidi({ open: true })), "p.mid");
+    expect(raw.pedal?.[1][0]).toBe(4);
+    expect(raw.pedal?.[1][1]).toBeCloseTo(8, 2);
+  });
+
+  it("sin pedal, no hay campo pedal", () => {
+    expect(midiToRaw(parseMidi(songToMidi(byId("oda2"))), "o.mid").pedal).toBeUndefined();
   });
 });

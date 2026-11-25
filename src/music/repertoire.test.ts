@@ -98,3 +98,40 @@ describe.each(MORE.map((s) => [s.id, s] as const))("pieza nueva %s", (_id, song)
     }
   });
 });
+
+describe("pedal (009)", () => {
+  const WITH = ["oda2", "oda-acordes", "cuna", "largo", "despedida", "nochedepaz", "estrellita2", "canon", "preludio", "greensleeves", "elisa2"];
+  const WITHOUT = ["minueto", "elisa", "pregunta", "martinillo-canon", "rema"];
+
+  it("ninguna pieza de nivel 1–2 lleva pedal (FR-002)", () => {
+    expect(SONGS.filter((s) => levelOf(s) <= 2 && s.pedal).map((s) => s.id)).toEqual([]);
+  });
+
+  it("llevan pedal las piezas de nivel 3–4 con acompañamiento, y solo ellas (FR-003, SC-001)", () => {
+    const upper = SONGS.filter((s) => levelOf(s) >= 3).map((s) => s.id).sort();
+    expect(upper).toEqual([...WITH, ...WITHOUT].sort());
+    expect(SONGS.filter((s) => s.pedal?.length).map((s) => s.id).sort()).toEqual([...WITH].sort());
+  });
+
+  it("«Pedal» en la tarjeta si y solo si hay pedal (FR-014)", () => {
+    for (const s of SONGS) expect([s.id, / · Pedal$/.test(s.level)]).toEqual([s.id, !!s.pedal]);
+  });
+
+  it.each(WITH)("%s: tocada sin fallos y sin pedal da 3 estrellas, sin mencionar el pedal (SC-002)", (id) => {
+    const song = SONGS.find((s) => s.id === id)!;
+    expect(buildScore(song).pedals.length).toBeGreaterThan(0);
+    const score = buildScore(song);
+    const { host, clock } = fakeHost();
+    const l = new Lesson(score, "play", "both", song.tempo, host);
+    l.start();
+    const ms = l.spb * 1000;
+    for (const n of [...score.notes].sort((a, b) => a.s - b.s)) {
+      clock.t = (COUNT_IN * score.pulse + n.s) * ms;
+      l.input(n.m);
+    }
+    const r = l.result();
+    l.stop();
+    expect(r.stars).toBe(3);
+    expect(r.message.toLowerCase()).not.toContain("pedal");
+  });
+});

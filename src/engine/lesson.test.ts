@@ -679,3 +679,99 @@ describe("Greensleeves (SC-007)", () => {
     l.stop();
   });
 });
+
+describe("pedal (009)", () => {
+  const base: SongDef = { id: "p", title: "p", level: "Nivel 3 · Pedal", tempo: 60, n: [[60, 1], [62, 1], [64, 1], [65, 1], [67, 4]] };
+  const withPedal: SongDef = { ...base, pedal: [[0, 4], [4, 8]] };
+
+  /** Toca en «Tocar» una secuencia fija: notas a destiempo, una omitida y una de más. */
+  function playFixed(def: SongDef) {
+    const score = buildScore(def);
+    const { host, clock } = fakeHost();
+    const l = new Lesson(score, "play", "both", 60, host);
+    l.start();
+    const presses: [number, number][] = [[60, 4000], [62, 5250], [61, 5600], [65, 7100], [67, 8000]];
+    for (const [m, t] of presses) {
+      clock.t = t;
+      l.input(m);
+    }
+    clock.t = 20000;
+    const r = l.result();
+    l.stop();
+    return r;
+  }
+
+  it("el resultado de Tocar es idéntico con y sin pedal (FR-007)", () => {
+    expect(buildScore(withPedal).pedals.length).toBe(2);
+    expect(playFixed(withPedal)).toEqual(playFixed(base));
+  });
+
+  it("el resultado de Aprender es idéntico con y sin pedal (FR-007)", () => {
+    vi.useFakeTimers();
+    const learn = (def: SongDef) => {
+      const { host, finished } = fakeHost();
+      const l = new Lesson(buildScore(def), "learn", "both", 60, host);
+      l.start();
+      l.input(61);
+      for (const [m] of def.n!) l.input(m as number);
+      vi.runAllTimers();
+      return finished[0];
+    };
+    expect(learn(withPedal)).toEqual(learn(base));
+    vi.useRealTimers();
+  });
+
+  describe("sonido", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** Duración pedida para cada altura en Escuchar (primera vez que suena). */
+    function listen(def: SongDef, loop?: { from: number; to: number }, ms = 9000) {
+      const { host, tick } = tempoHost();
+      const release = vi.fn();
+      host.release = release;
+      const l = new Lesson(buildScore(def), "listen", "both", 60, host, loop ? { loop } : {});
+      l.start();
+      for (let t = 0; t < ms; t += 100) tick(100);
+      const tone = host.tone as ReturnType<typeof vi.fn>;
+      const first = new Map<number, number>();
+      for (const [m, s] of tone.mock.calls as [number, number][]) if (!first.has(m)) first.set(m, s);
+      return { l, first, release };
+    }
+
+    it("en Escuchar, la nota se sostiene hasta que se levanta o cambia el pedal (FR-008)", () => {
+      const { first } = listen(withPedal);
+      expect(first.get(60)).toBeCloseTo(4 * 0.95);
+      expect(first.get(64)).toBeCloseTo(2 * 0.95);
+      expect(first.get(65)).toBeCloseTo(1 * 0.95);
+      expect(first.get(67)).toBeCloseTo(4 * 0.95);
+    });
+
+    it("sin pedal (o en nivel 2), la duración escrita", () => {
+      expect(listen(base).first.get(60)).toBeCloseTo(0.95);
+      expect(listen({ ...withPedal, level: "Nivel 2" }).first.get(60)).toBeCloseTo(0.95);
+    });
+
+    it("con bucle, nada suena más allá del fragmento", () => {
+      const { first } = listen({ ...base, pedal: [[0, 8]] }, { from: 0, to: 0 }, 3000);
+      expect(first.get(60)).toBeCloseTo(4 * 0.95);
+      expect(first.get(62)).toBeCloseTo(3 * 0.95);
+    });
+
+    it("stop() y cada repetición del bucle liberan el sonido (FR-010)", () => {
+      const { l, release } = listen(withPedal, { from: 0, to: 0 }, 9000);
+      const reps = release.mock.calls.length;
+      expect(reps).toBeGreaterThanOrEqual(2);
+      l.stop();
+      expect(release.mock.calls.length).toBe(reps + 1);
+    });
+
+    it("un host sin release sigue funcionando", () => {
+      const { host, tick } = tempoHost();
+      const l = new Lesson(buildScore(withPedal), "listen", "both", 60, host);
+      l.start();
+      tick(1000);
+      expect(() => l.stop()).not.toThrow();
+    });
+  });
+});

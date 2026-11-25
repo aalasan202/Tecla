@@ -7,7 +7,7 @@ import { noteLabel } from "../music/spelling";
 import type { ScoreNote } from "../music/types";
 import { Lesson, type HandChoice, type LessonResult, type Mode, type NoteMark } from "../engine/lesson";
 import { canNudge, emptySelection, nudge, rangeOf, tapMeasure, toggleLoop, type FragmentEdge, type FragmentSelection } from "../engine/fragment";
-import { ensureAudio, playClick, playTone } from "../audio/synth";
+import { ensureAudio, playClick, playTone, releaseAll } from "../audio/synth";
 import { useMidiInput } from "../midi/MidiProvider";
 import { settings } from "../state/settings";
 import { addPractice, progress, recordSession, recordStars } from "../state/progress";
@@ -130,6 +130,7 @@ function LessonView({ songId }: { songId: string }) {
       scrollTo: (x, smooth) => staff.current?.scrollTo(x, smooth),
       flash: (m, kind, ms) => keys.current?.flash(m, kind, ms),
       tone: playTone,
+      release: releaseAll,
       click: playClick,
       now: () => performance.now(),
       frame: (cb) => requestAnimationFrame(cb),
@@ -150,6 +151,8 @@ function LessonView({ songId }: { songId: string }) {
         l.stop();
         saveAttempt(l);
       }
+      // al salir o cambiar de paso no se queda nada sonando (009, FR-010)
+      releaseAll();
     };
     // el tempo no reinicia la lección; resume solo se lee al entrar
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -246,6 +249,34 @@ function LessonView({ songId }: { songId: string }) {
         <input type="checkbox" checked={prefs.showFingers} onChange={(e) => settings.set({ showFingers: e.target.checked })} /> Números de dedo
       </label>
     </>
+  );
+  // primera pieza con pedal: explicación breve que no vuelve a salir (009, FR-011)
+  // en móvil apaisado, panel superpuesto; en escritorio, aviso sobre la partitura
+  const pedalHelpOpen = score.pedals.length > 0 && !prefs.pedalHelpSeen;
+  const closePedalHelp = () => void settings.set({ pedalHelpSeen: true });
+  const pedalHelpBody = (
+    <>
+      <h2>Pedal de resonancia</h2>
+      <p className="hint">
+        La línea bajo la partitura indica el pedal derecho (de resonancia): písalo con el pie donde empieza la línea,
+        levántalo y vuelve a pisarlo en cada pico, y suéltalo donde termina. Es una indicación de lectura: no cuenta para
+        la puntuación.
+      </p>
+      <button type="button" className="btn primary" onClick={closePedalHelp}>
+        Entendido
+      </button>
+    </>
+  );
+  const pedalHelp = compact ? (
+    <Popover open={pedalHelpOpen} onClose={closePedalHelp} anchor="start" label="Pedal de resonancia">
+      {pedalHelpBody}
+    </Popover>
+  ) : (
+    pedalHelpOpen && (
+      <div className="pedal-help" role="note" aria-label="Pedal de resonancia">
+        {pedalHelpBody}
+      </div>
+    )
   );
   const board = (
     <div className="board">
@@ -380,6 +411,7 @@ function LessonView({ songId }: { songId: string }) {
           <ConnectionStatus />
           <a href="#ajustes">Ajustes</a>
         </Popover>
+        {pedalHelp}
 
         {board}
         {resultCard}
@@ -424,6 +456,7 @@ function LessonView({ songId }: { songId: string }) {
       </div>
       <p className="hint">{hint}</p>
 
+      {pedalHelp}
       {board}
 
       <div className="controls">
