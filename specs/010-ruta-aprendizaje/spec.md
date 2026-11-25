@@ -29,7 +29,7 @@ con la mano izquierda para el nivel 3. Los consejos de los niveles 3–4 quedan 
 ### Ruta orientativa
 
 El orden y los títulos definitivos se ajustan durante la planificación, respetando los
-requisitos. Esta es la ruta de referencia (14 lecciones, 6 hitos, 13 consejos):
+requisitos. Esta es la ruta de referencia (14 lecciones, 7 hitos, 13 consejos):
 
 **Unidad 1 · Primeros pasos (nivel 1)**
 
@@ -43,8 +43,9 @@ requisitos. Esta es la ruta de referencia (14 lecciones, 6 hitos, 13 consejos):
 8. Hito · Cinco dedos
 9. Consejo · Tocar sin golpear
 10. Lección (ritmo) · Redondas y silencios
-11. Hito · Himno a la alegría
-12. Consejo · Practicar poco y a menudo
+11. Lección (lectura) · Pasos y saltos en el pentagrama
+12. Hito · Himno a la alegría
+13. Consejo · Practicar poco y a menudo
 
 **Unidad 2 · Moverse por el teclado (nivel 2)**
 
@@ -211,7 +212,8 @@ puntúan igual si se hacen bien.
 4. **Given** el teclado en pantalla en un dispositivo táctil, **When** se tocan las tres notas
    con tres dedos, **Then** funciona igual que con un teclado MIDI.
 5. **Given** cualquier lección de acordes, **When** se muestra la partitura, **Then** los
-   acordes aparecen apilados en la clave de fa con la digitación de la mano izquierda.
+   acordes aparecen apilados en la clave de fa. La explicación muestra los dedos 5‑3‑1 en el
+   teclado, y la partitura los muestra según el ajuste «Números de dedo».
 
 ---
 
@@ -310,14 +312,14 @@ tocar una pieza desde Canciones y repetir.
   guarda la mejor marca y nunca se vuelve a bloquear nada.
 - **Cambio de ajustes**: la notación (Do‑Re‑Mi o C‑D‑E), los nombres de nota, los dedos y el tema
   se aplican en explicaciones, ejercicios y fichas, también en el texto de las explicaciones.
-- **Móvil en vertical**: en el ejercicio se pide girar el dispositivo como en el resto de la
-  práctica. Las fichas de consejo y las explicaciones se leen bien también en vertical.
+- **Móvil en vertical**: como en el resto de la app, se pide girar el dispositivo (también en el
+  mapa, las explicaciones y las fichas).
 - **Teclado MIDI que se desconecta durante el ejercicio**: se comporta como en las piezas, y se
   puede seguir con el teclado en pantalla.
 - **Sin conexión**: el Curso, incluidas las ilustraciones, funciona sin conexión una vez instalada
   o visitada la app.
 - **Acorde con el ratón demasiado lento**: si las tres notas no llegan dentro de la ventana, cuenta
-  como fallo y la app recuerda que hay que pulsarlas seguidas.
+  como fallo. La pista del ejercicio recuerda que hay que pulsarlas seguidas y rápido.
 - **Ritmo con varias teclas a la vez**: en un ejercicio de ritmo, varias teclas pulsadas a la vez
   cuentan como un solo golpe.
 - **Borrar el progreso** (si los ajustes lo permiten): el Curso vuelve al estado inicial.
@@ -376,6 +378,9 @@ tocar una pieza desde Canciones y repetir.
   dentro de una ventana corta de tiempo, y como fallado si falta alguna o se añade una nota ajena.
 - **FR-014**: Con el teclado en pantalla sin pulsación simultánea, MUST aceptarse las tres notas
   pulsadas una tras otra dentro de una ventana más amplia, que suenan juntas como acorde.
+- **FR-014a**: FR-013 y FR-014 se aplican igual a las piezas del repertorio con acordes, en el
+  Curso y en Canciones, para que el hito final pueda superarse con el teclado en pantalla
+  (Principio III). Las piezas sin acordes no cambian.
 
 **Avance y desbloqueo**
 
@@ -430,11 +435,6 @@ tocar una pieza desde Canciones y repetir.
   Las explicaciones y las fichas MUST leerse sin desplazamiento horizontal en móvil apaisado.
 - **FR-033**: El progreso del Curso (estrellas de lecciones, consejos vistos, unidades superadas
   por prueba) MUST guardarse en el dispositivo junto al resto del progreso (Principio V).
-- **FR-036**: El tiempo practicado en lecciones, hitos y pruebas de nivel del Curso MUST sumarse al
-  tiempo de práctica, y practicar en el Curso MUST contar como día de práctica para la racha.
-- **FR-037**: Las estrellas de las lecciones y de las pruebas de nivel MUST NOT sumarse al total de
-  estrellas del repertorio. Inicio y Progreso MUST mostrarlas aparte («Curso: N de M estrellas»).
-  Las estrellas de los hitos siguen contando en el repertorio, como hasta ahora.
 
 **Calidad del contenido**
 
@@ -443,6 +443,14 @@ tocar una pieza desde Canciones y repetir.
 - **FR-035**: Una comprobación automática MUST verificar que cada hito apunta a una pieza
   existente del repertorio incluido y que cada unidad cumple las reglas de estructura (FR-002,
   FR-005, FR-006).
+
+**Tiempo, racha y estrellas**
+
+- **FR-036**: El tiempo practicado en lecciones, hitos y pruebas de nivel del Curso MUST sumarse al
+  tiempo de práctica, y practicar en el Curso MUST contar como día de práctica para la racha.
+- **FR-037**: Las estrellas de las lecciones y de las pruebas de nivel MUST NOT sumarse al total de
+  estrellas del repertorio. Inicio y Progreso MUST mostrarlas aparte («Curso: N de M estrellas»).
+  Las estrellas de los hitos siguen contando en el repertorio, como hasta ahora.
 
 ### Key Entities
 
