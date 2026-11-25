@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { COUNT_IN, Lesson, groupByTime, starsFor, type LessonHost } from "./lesson";
+import { COUNT_IN, Lesson, groupByTime, starsFor, type InputVia, type LessonHost } from "./lesson";
 import { buildScore } from "../music/score";
 import { SONGS } from "../music/songs";
 import type { Score, SongDef } from "../music/types";
@@ -773,5 +773,104 @@ describe("pedal (009)", () => {
       tick(1000);
       expect(() => l.stop()).not.toThrow();
     });
+  });
+});
+
+describe("ritmo (010)", () => {
+  // 4 negras en Do4, a 60 ppm: 1 pulso = 1000 ms; el pulso 0 cae en t = 4000 (cuenta atrás)
+  const rhythm: SongDef = { id: "curso-r", title: "r", level: "Nivel 1 · Curso", tempo: 60, kind: "rhythm", n: [[60, 1], [60, 1], [60, 1], [60, 1]] };
+  const play = (rhythmOpt: boolean, presses: [number, number][]) => {
+    const { host, clock } = fakeHost();
+    const l = new Lesson(buildScore(rhythm), "play", "both", 60, host, { rhythm: rhythmOpt });
+    l.start();
+    for (const [t, m] of presses) {
+      clock.t = t;
+      l.input(m);
+    }
+    const r = l.result();
+    l.stop();
+    return r;
+  };
+
+  it("cualquier tecla vale: golpes a tiempo dan 3 estrellas", () => {
+    const r = play(true, [[4000, 60], [5000, 72], [6000, 65], [7000, 50]]);
+    expect(r.score).toBeCloseTo(1);
+    expect(r.stars).toBe(3);
+  });
+
+  it("golpes fuera de la ventana no cuentan: 0 estrellas", () => {
+    const r = play(true, [[4500, 60], [5500, 60], [6500, 60], [7500, 60]]);
+    expect(r.stars).toBe(0);
+  });
+
+  it("dos teclas a la vez cuentan como un solo golpe, sin sobrante", () => {
+    const single = play(true, [[4000, 60]]);
+    const double = play(true, [[4000, 60], [4050, 64]]);
+    expect(double.score).toBeCloseTo(single.score!);
+    expect(double.score).toBeCloseTo(0.25);
+  });
+
+  it("un golpe sin nota cerca es un sobrante", () => {
+    const r = play(true, [[4000, 60], [4500, 60]]);
+    expect(r.score).toBeCloseTo((1 - 0.25) / 4);
+  });
+
+  it("sin la opción, la altura sigue importando", () => {
+    const r = play(false, [[4000, 72], [5000, 72], [6000, 72], [7000, 72]]);
+    expect(r.stars).toBe(0);
+  });
+});
+
+describe("acordes (010)", () => {
+  const DO = [48, 52, 55];
+  // dos acordes de redonda en la mano izquierda, a 60 ppm: pulsos 0 y 4 (t = 4000 y 8000)
+  const chords: SongDef = { id: "curso-c", title: "c", level: "Nivel 2 · Curso", tempo: 60, kind: "chords", r: [[0, 4], [0, 4]], l: [[DO, 4], [DO, 4]] };
+  const spread = (via: InputVia) => (via === "screen-mouse" || via === "computer-keys" ? 1.5 : 0.15);
+  const play = (presses: [number, number, InputVia][], withSpread = true) => {
+    const { host, clock } = fakeHost();
+    const l = new Lesson(buildScore(chords), "play", "both", 60, host, withSpread ? { chordSpread: spread } : {});
+    l.start();
+    for (const [t, m, via] of presses) {
+      clock.t = t;
+      l.input(m, via);
+    }
+    const r = l.result();
+    l.stop();
+    return r;
+  };
+  const together = (t: number, via: InputVia): [number, number, InputVia][] => DO.map((m, i) => [t + i * 20, m, via]);
+  const spaced = (t: number, gap: number, via: InputVia): [number, number, InputVia][] => DO.map((m, i) => [t + i * gap, m, via]);
+
+  it("a la vez con MIDI: acierto y 3 estrellas", () => {
+    const r = play([...together(4000, "midi"), ...together(8000, "midi")]);
+    expect(r.score).toBeCloseTo(1);
+    expect(r.stars).toBe(3);
+  });
+
+  it("con el ratón, una tras otra en 1,2 s: acierto y 3 estrellas", () => {
+    const r = play([...spaced(4000, 600, "screen-mouse"), ...spaced(8000, 600, "screen-mouse")]);
+    expect(r.score).toBeCloseTo(1);
+    expect(r.stars).toBe(3);
+  });
+
+  it("con el ratón, en 2 s: el acorde falla", () => {
+    const r = play([...spaced(4000, 1000, "screen-mouse"), ...together(8000, "screen-mouse")]);
+    expect(r.score).toBeLessThan(0.5);
+  });
+
+  it("con MIDI, repartidas en 0,6 s: el acorde falla", () => {
+    const r = play([...spaced(4000, 300, "midi"), ...together(8000, "midi")]);
+    expect(r.score).toBeLessThan(0.5);
+  });
+
+  it("una nota ajena con el acorde abierto lo estropea", () => {
+    const r = play([[4000, 48, "screen-mouse"], [4300, 50, "screen-mouse"], [4600, 52, "screen-mouse"], [4900, 55, "screen-mouse"], ...together(8000, "midi")]);
+    // el primer acorde no puntúa y la nota ajena resta como sobrante
+    expect(r.score).toBeCloseTo((1 - 0.25) / 2);
+  });
+
+  it("sin la opción, las notas tardías son sobrantes, como siempre", () => {
+    const r = play([...spaced(4000, 600, "screen-mouse"), ...together(8000, "midi")], false);
+    expect(r.score).toBeLessThan(0.5);
   });
 });

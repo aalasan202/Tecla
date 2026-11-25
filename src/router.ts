@@ -7,11 +7,17 @@ export type Route =
   | { name: "lesson"; songId: string }
   | { name: "piano" }
   | { name: "progress" }
-  | { name: "settings" };
+  | { name: "settings" }
+  | { name: "course" }
+  | { name: "courseItem"; itemId: string }
+  | { name: "courseTest"; unitId: string };
 
 export function parseRoute(hash: string): Route {
-  const [path, arg] = hash.replace(/^#\/?/, "").split("/");
+  const [path, arg, arg2] = hash.replace(/^#\/?/, "").split("/");
   switch (path) {
+    case "curso":
+      if (arg === "prueba" && arg2) return { name: "courseTest", unitId: decodeURIComponent(arg2) };
+      return arg ? { name: "courseItem", itemId: decodeURIComponent(arg) } : { name: "course" };
     case "canciones":
       return { name: "songs" };
     case "leccion":
@@ -41,6 +47,12 @@ export function hrefFor(route: Route): string {
       return "#progreso";
     case "settings":
       return "#ajustes";
+    case "course":
+      return "#curso";
+    case "courseItem":
+      return `#curso/${encodeURIComponent(route.itemId)}`;
+    case "courseTest":
+      return `#curso/prueba/${encodeURIComponent(route.unitId)}`;
   }
 }
 

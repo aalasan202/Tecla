@@ -13,6 +13,7 @@ export function validateSong(song: SongDef): string[] {
   const lengths: number[] = [];
 
   if (song.time !== undefined && song.time !== "6/8") errors.push(`compás no admitido: ${song.time}`);
+  if (song.kind === "rhythm" && (song.time !== undefined || bar !== 4)) errors.push("un ejercicio de ritmo (kind rhythm) va en 4/4");
   const keyOk = (k: number) => Number.isInteger(k) && k >= -7 && k <= 7;
   if (song.key !== undefined && !keyOk(song.key)) errors.push(`armadura fuera de −7…7: ${song.key}`);
 

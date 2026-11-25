@@ -31,6 +31,21 @@ describe("validateSong", () => {
     expect(errs({ r: [[60, 4]], l: [[48, 4], [48, 4]] })).toMatch(/no duran lo mismo/);
   });
 
+  it("un ejercicio de ritmo (010) va en 4/4", () => {
+    expect(errs({ kind: "rhythm", n: [[60, 4]] })).toBe("");
+    expect(errs({ kind: "rhythm", bar: 3, n: [[60, 3]] })).toMatch(/ritmo.*4\/4/);
+    expect(errs({ kind: "rhythm", time: "6/8", n: [[60, 3]] })).toMatch(/ritmo.*4\/4/);
+  });
+
+  it("acepta una pieza de mano izquierda con la derecha en silencio (010)", () => {
+    const song: SongDef = { ...base, r: [[0, 4], [0, 4]], l: [[[48, 52, 55], 4], [48, 2], [55, 2]] };
+    expect(validateSong(song)).toEqual([]);
+    const s = buildScore(song);
+    expect(s.twoHands).toBe(true);
+    expect(s.notes.every((n) => n.h === "L")).toBe(true);
+    expect(s.notes).toHaveLength(5);
+  });
+
   it("exige alturas 21–108 y acordes sin repetir altura", () => {
     expect(errs({ n: [[20, 4]] })).toMatch(/21–108/);
     expect(errs({ n: [[[60, 60, 64], 4]] })).toMatch(/no repite altura/);

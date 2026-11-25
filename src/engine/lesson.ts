@@ -57,10 +57,22 @@ export interface LessonOptions {
   atTempo?: boolean;
   /** Repite solo estos compases, indefinidamente, en cualquier paso. */
   loop?: LoopRange;
+  /** Tocar (010): cualquier tecla vale; solo se evalúa el momento de cada golpe. */
+  rhythm?: boolean;
+  /**
+   * Tocar (010): segundos para completar un acorde ya empezado, según de dónde venga la
+   * pulsación. Sin él, cada nota del acorde se juzga por separado como siempre.
+   */
+  chordSpread?: number | ((via: InputVia) => number);
 }
+
+/** De dónde viene una pulsación: pantalla táctil, ratón, teclado MIDI o letras del ordenador. */
+export type InputVia = "screen-touch" | "screen-mouse" | "midi" | "computer-keys";
 
 /** Pulsos de metrónomo de cuenta atrás antes de Tocar. */
 export const COUNT_IN = 4;
+/** Ritmo (010): pulsaciones más juntas que esto (s) cuentan como un solo golpe. */
+export const RHYTHM_MERGE = 0.08;
 /** Con bucle en Tocar, la repetición se cierra este margen (en pulsos) tras el final del fragmento. */
 const LOOP_CLOSE = HIT_WINDOW + 0.15;
 
@@ -104,6 +116,16 @@ export class Lesson {
   private reps: LessonResult[] = [];
   private raf = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
+  /** Ritmo (010): cualquier tecla vale. */
+  private readonly rhythm: boolean;
+  /** Ritmo: hora (ms) del último golpe contado, para fundir pulsaciones simultáneas. */
+  private lastPress = -Infinity;
+  /** Acordes (010): ventana para completar un acorde según el origen de la pulsación. */
+  private readonly chordSpread: ((via: InputVia) => number) | null;
+  /** Acorde empezado: su `unit`, hasta cuándo (ms) se aceptan sus notas y el juicio de la primera. */
+  private openChord: { unit: number; until: number; judged: "perfect" | "good" } | null = null;
+  /** Acordes estropeados por una nota ajena: no puntúan. */
+  private spoiled = new Set<number>();
 
   constructor(
     readonly score: Score,
@@ -117,6 +139,9 @@ export class Lesson {
     this.loop = options.loop ? normalizeLoop(options.loop, score.total / score.bar) : null;
     this.start0 = this.loop ? this.loop.from * score.bar : 0;
     this.end = this.loop ? (this.loop.to + 1) * score.bar : score.total;
+    this.rhythm = options.rhythm === true;
+    const spread = options.chordSpread;
+    this.chordSpread = spread === undefined ? null : typeof spread === "number" ? () => spread : spread;
     this.reset();
   }
 
@@ -156,6 +181,7 @@ export class Lesson {
     this.rep = 1;
     this.closed = 0;
     this.reps = [];
+    this.resetJudging();
     if (this.loop && this.mode !== "listen" && !this.active().length) {
       this.host.status(...EMPTY_FRAGMENT);
       return;
@@ -187,12 +213,28 @@ export class Lesson {
     this.host.release?.();
   }
 
-  /** Una tecla pulsada (pantalla, teclado del ordenador o MIDI). */
-  input(m: number): void {
+  /** Una tecla pulsada (pantalla, teclado del ordenador o MIDI) y, si se sabe, de dónde viene. */
+  input(m: number, via?: InputVia): void {
     if (this.running && this.mode === "learn") return this.inputLearn(m);
-    if (this.running && this.mode === "play") return this.inputPlay(m);
+    if (this.running && this.mode === "play") return this.inputPlay(m, via);
     this.host.tone(m, 0.5);
     this.host.flash(m, "down", 180);
+  }
+
+  private resetJudging(): void {
+    this.lastPress = -Infinity;
+    this.openChord = null;
+    this.spoiled = new Set();
+  }
+
+  /** Notas de un acorde (mismo `unit`) dentro de lo que se practica. */
+  private chordNotes(unit: number): ScoreNote[] {
+    return this.active().filter((n) => n.unit === unit);
+  }
+
+  /** Acordes (010): el acorde abierto sigue aceptando notas. */
+  private chordOpen(unit: number): boolean {
+    return this.openChord !== null && this.openChord.unit === unit && this.host.now() <= this.openChord.until;
   }
 
   private inputLearn(m: number): void {
@@ -230,13 +272,33 @@ export class Lesson {
     } else this.host.tone(m, 0.3);
   }
 
-  private inputPlay(m: number): void {
-    this.host.tone(m, 0.4);
+  private inputPlay(m: number, via: InputVia = "screen-mouse"): void {
+    const now = this.host.now();
+    // ritmo: varias teclas a la vez son un solo golpe (ni acierto ni sobrante de más)
+    if (this.rhythm && (now - this.lastPress) / 1000 < RHYTHM_MERGE) {
+      this.host.tone(m, 0.4);
+      this.host.flash(m, "ok");
+      return;
+    }
+    // acordes: un acorde empezado acepta sus notas que faltan durante la ventana
+    const open = this.openChord;
+    if (open && now <= open.until) {
+      const n = this.chordNotes(open.unit).find((x) => x.m === m && !this.rt[x.id].judged);
+      if (n) {
+        this.rt[n.id].judged = open.judged;
+        this.host.tone(m, n.d * this.spb * 0.95);
+        this.host.mark(n.id, "hit");
+        this.host.flash(m, "ok");
+        if (this.chordNotes(open.unit).every((x) => this.rt[x.id].judged)) this.openChord = null;
+        return;
+      }
+    }
+
     const beat = this.loop ? this.where().b : this.beat();
     let best: ScoreNote | null = null;
     let bestDist = Infinity;
     for (const n of this.active()) {
-      if (this.rt[n.id].judged || n.m !== m) continue;
+      if (this.rt[n.id].judged || (!this.rhythm && n.m !== m)) continue;
       const d = Math.abs(n.s - beat);
       if (d <= n.win.hit && d < bestDist) {
         bestDist = d;
@@ -244,13 +306,27 @@ export class Lesson {
       }
     }
     if (best) {
-      this.rt[best.id].judged = bestDist <= best.win.perfect ? "perfect" : "good";
+      const judged = bestDist <= best.win.perfect ? "perfect" : "good";
+      this.rt[best.id].judged = judged;
+      this.lastPress = now;
       this.host.mark(best.id, "hit");
       this.host.flash(m, "ok");
-    } else {
-      this.extra++;
-      this.host.flash(m, "wrong", 300);
+      const chord = this.chordSpread ? this.chordNotes(best.unit) : [];
+      if (chord.length > 1) {
+        // las notas del acorde siguen sonando mientras se completa
+        this.host.tone(m, best.d * this.spb * 0.95);
+        if (!this.openChord || this.openChord.unit !== best.unit)
+          this.openChord = { unit: best.unit, until: now + this.chordSpread!(via) * 1000, judged };
+      } else this.host.tone(m, 0.4);
+      return;
     }
+    this.host.tone(m, 0.4);
+    this.extra++;
+    this.lastPress = now;
+    this.host.flash(m, "wrong", 300);
+    // una nota ajena con un acorde abierto lo estropea; el acorde sigue abierto para que sus
+    // notas restantes no cuenten además como sobrantes
+    if (open && now <= open.until) this.spoiled.add(open.unit);
   }
 
   private beat(): number {
@@ -329,6 +405,7 @@ export class Lesson {
     this.mistakes = 0;
     this.extra = 0;
     this.gi = 0;
+    this.resetJudging();
     if (this.mode === "learn") {
       if (this.atTempo) {
         this.pos = this.start0;
@@ -470,7 +547,8 @@ export class Lesson {
       const act = this.active();
       for (const n of act) {
         const r = this.rt[n.id];
-        if (!r.judged && beat > n.s + n.win.hit) {
+        // un acorde abierto (010) aún puede completarse: no se da por fallado
+        if (!r.judged && beat > n.s + n.win.hit && !this.chordOpen(n.unit)) {
           r.judged = "miss";
           this.host.mark(n.id, "miss");
         }
@@ -531,7 +609,8 @@ export class Lesson {
     if (this.mode === "learn") pct = n / (n + this.mistakes);
     else {
       let points = 0;
-      for (const notes of units.values()) {
+      for (const [unit, notes] of units) {
+        if (this.spoiled.has(unit)) continue;
         const judged = notes.map((x) => this.rt[x.id].judged);
         if (judged.every((j) => j === "perfect")) points += 1;
         else if (judged.every((j) => j === "perfect" || j === "good")) points += 0.7;

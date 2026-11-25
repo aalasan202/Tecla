@@ -60,6 +60,11 @@ export interface SongDef {
   l?: Track;
   /** Tramos de pedal de resonancia, ordenados y sin solaparse. Solo se usan desde el nivel 3. */
   pedal?: PedalSpan[];
+  /**
+   * Ejercicio del Curso: ritmo (cualquier tecla) o acordes (ventana de simultaneidad).
+   * Las piezas del repertorio no lo usan.
+   */
+  kind?: "rhythm" | "chords";
 }
 
 /** Cómo se escribe y se nombra una altura: nota (C…B) y alteración (−2…2). */
