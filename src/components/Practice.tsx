@@ -3,7 +3,8 @@ import { buildScore, measureCount } from "../music/score";
 import { noteName } from "../music/theory";
 import { noteLabel } from "../music/spelling";
 import type { ScoreNote, SongDef } from "../music/types";
-import { Lesson, type HandChoice, type LessonOptions, type LessonResult, type Mode, type NoteMark } from "../engine/lesson";
+import { Lesson, type HandChoice, type InputVia, type LessonOptions, type LessonResult, type Mode, type NoteMark } from "../engine/lesson";
+import { BeatIndicator, type BeatHandle } from "./BeatIndicator";
 import { canNudge, emptySelection, nudge, rangeOf, tapMeasure, toggleLoop, type FragmentEdge, type FragmentSelection } from "../engine/fragment";
 import { ensureAudio, playClick, playTone, releaseAll } from "../audio/synth";
 import { useMidiInput } from "../midi/MidiProvider";
@@ -38,6 +39,9 @@ const LEARN_AT_TEMPO_HINTS: [string, string] = [
 const LOOP_PLAY_HINT = " Entre repeticiones hay un compás de descanso para volver a colocar la mano.";
 const ALL_MODES: [Mode, string][] = [["listen", "Escuchar"], ["learn", "Aprender"], ["play", "Tocar"]];
 
+/** Margen para completar un acorde (010, R5): amplio con ratón o letras, corto con MIDI o dedos. */
+export const chordWindow = (via: InputVia): number => (via === "screen-mouse" || via === "computer-keys" ? 1.5 : 0.15);
+
 export interface PracticeProps {
   song: SongDef;
   /** Pasos disponibles (los tres por defecto; en ritmo, Escuchar y Tocar). */
@@ -50,6 +54,8 @@ export interface PracticeProps {
   allowLoop?: boolean;
   /** Elegir mano en piezas a dos manos; false en el Curso (siempre ambas). */
   handsChoice?: boolean;
+  /** Indicador visual del pulso del metrónomo (Curso). */
+  beat?: boolean;
   /** A dónde vuelve Atrás. */
   back: Route;
   /** Texto de ayuda propio para cada paso (sustituye al de las piezas). */
@@ -73,6 +79,7 @@ export function Practice({
   engine,
   allowLoop = true,
   handsChoice = true,
+  beat = false,
   back,
   hint: customHint,
   onStep,
@@ -124,6 +131,13 @@ export function Practice({
   cb.current = { onStep, onAttempt, onPlayResult };
   const engineRef = useRef(engine);
   engineRef.current = engine;
+  const beatRef = useRef<BeatHandle>(null);
+  // piezas con acordes (ejercicios y repertorio): margen para completarlos según el origen (FR-014a)
+  const hasChords = useMemo(() => {
+    const units = new Map<number, number>();
+    for (const n of score.notes) units.set(n.unit, (units.get(n.unit) ?? 0) + 1);
+    return [...units.values()].some((c) => c > 1);
+  }, [score]);
 
   // cuánto has practicado y hasta dónde llegaste, al parar, terminar o salir
   const saveAttempt = useCallback((l: Lesson) => {
@@ -158,7 +172,10 @@ export function Practice({
         flash: (m, kind, ms) => keys.current?.flash(m, kind, ms),
         tone: playTone,
         release: releaseAll,
-        click: playClick,
+        click: (strong) => {
+          playClick(strong);
+          beatRef.current?.pulse(strong);
+        },
         now: () => performance.now(),
         frame: (f) => requestAnimationFrame(f),
         cancelFrame: (id) => cancelAnimationFrame(id),
@@ -172,6 +189,7 @@ export function Practice({
         },
       },
       {
+        ...(hasChords ? { chordSpread: chordWindow } : {}),
         ...engineRef.current,
         atTempo: prefs.learnAtTempo,
         loop: loopFrom === undefined || loopTo === undefined ? undefined : { from: loopFrom, to: loopTo },
@@ -195,8 +213,8 @@ export function Practice({
     if (lesson.current) lesson.current.tempo = tempo;
   }, [tempo]);
 
-  const press = useCallback((m: number) => lesson.current?.input(m), []);
-  useMidiInput(press);
+  const press = useCallback((m: number, via: InputVia) => lesson.current?.input(m, via), []);
+  useMidiInput(useCallback((m: number) => press(m, "midi"), [press]));
 
   const toggleRun = () => {
     const l = lesson.current;
@@ -337,6 +355,7 @@ export function Practice({
         fit={compact}
       />
       <div className="statusbar" aria-live="polite">
+        {beat && <BeatIndicator ref={beatRef} />}
         <span>{shownStatus[0]}</span>
         <strong>{shownStatus[1]}</strong>
       </div>

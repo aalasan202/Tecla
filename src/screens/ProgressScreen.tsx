@@ -3,6 +3,8 @@ import { formatDuration, lastWeek, progress, streak } from "../state/progress";
 import { repertoireStars } from "../state/library";
 import { TopBar } from "../components/TopBar";
 import { hrefFor } from "../router";
+import { useCourse } from "../state/useCourse";
+import { courseStars } from "../course/path";
 
 const WEEKDAY = ["D", "L", "M", "X", "J", "V", "S"];
 
@@ -15,12 +17,16 @@ export function ProgressScreen() {
   const stars = repertoireStars(p.best);
   const mastered = SONGS.filter((s) => (p.best[s.id] ?? 0) === 3).length;
   const days = streak(p.days);
+  // Curso (010): sus estrellas van aparte de las del repertorio (FR-037)
+  const { units, cp, state } = useCourse();
+  const cStars = courseStars(units, cp);
 
   const stats: [string, string][] = [
     ["Racha", `${days} ${days === 1 ? "día" : "días"}`],
     ["Esta semana", formatDuration(weekSeconds)],
     ["Estrellas", `${stars} de ${SONGS.length * 3}`],
     ["Piezas dominadas", `${mastered} de ${SONGS.length}`],
+    ["Curso", `${cStars.stars} de ${cStars.max} ★`],
   ];
 
   return (
@@ -48,7 +54,30 @@ export function ProgressScreen() {
             </div>
           ))}
         </div>
-        <p className="muted">En total has practicado {formatDuration(totalSeconds)}. Cuenta el tiempo con una lección en marcha y el que tocas en Piano libre.</p>
+        <p className="muted">
+          En total has practicado {formatDuration(totalSeconds)}. Cuenta el tiempo con una lección o ejercicio en marcha y el que tocas en Piano libre.
+        </p>
+      </section>
+
+      <section className="panel">
+        <h2>Curso</h2>
+        <ul className="song-list">
+          {units.map((u, i) => {
+            const lessons = u.items.filter((it) => it.type === "lesson");
+            const passed = lessons.filter((it) => state.items[it.id].status === "passed").length;
+            const label = state.units[u.id] === "skipped" ? "Superada por prueba" : `${passed} de ${lessons.length} lecciones`;
+            return (
+              <li key={u.id}>
+                <a href="#curso">
+                  Unidad {i + 1} · {u.title}
+                </a>
+                <span className="muted">Nivel {u.level}</span>
+                <span className="muted">{label}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="muted">Las estrellas del Curso se ganan en el paso Tocar de cada lección y no suman a las de Canciones.</p>
       </section>
 
       <section className="panel">

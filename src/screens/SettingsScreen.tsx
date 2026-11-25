@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { settings, type Theme } from "../state/settings";
 import { progress } from "../state/progress";
+import { course } from "../state/course";
 import { useMidiContext } from "../midi/MidiProvider";
 import { MIDI_HELP } from "../midi/useMidi";
 import { ensureAudio, playTone } from "../audio/synth";
@@ -124,11 +125,12 @@ export function SettingsScreen() {
         )}
         {confirmReset ? (
           <div className="row">
-            <span>¿Borrar estrellas, racha y tiempo de práctica?</span>
+            <span>¿Borrar estrellas, racha, tiempo de práctica y el avance del Curso?</span>
             <button
               className="btn danger"
               onClick={() => {
                 progress.reset();
+                course.reset();
                 setConfirmReset(false);
               }}
             >

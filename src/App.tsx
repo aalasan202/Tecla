@@ -11,6 +11,8 @@ import { ProgressScreen } from "./screens/ProgressScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { IconRotate } from "./components/Icons";
 import { PwaToast } from "./components/PwaToast";
+import { CourseMap } from "./screens/CourseMap";
+import { CourseItemScreen, CourseTestScreen } from "./screens/CourseItem";
 
 export default function App() {
   const route = useRoute();
@@ -43,6 +45,15 @@ export default function App() {
       break;
     case "settings":
       screen = <SettingsScreen />;
+      break;
+    case "course":
+      screen = <CourseMap />;
+      break;
+    case "courseItem":
+      screen = <CourseItemScreen key={route.itemId} itemId={route.itemId} />;
+      break;
+    case "courseTest":
+      screen = <CourseTestScreen key={route.unitId} unitId={route.unitId} />;
       break;
     default:
       screen = <Home />;

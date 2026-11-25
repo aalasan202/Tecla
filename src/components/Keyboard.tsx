@@ -4,6 +4,8 @@ import type { KeyFlash } from "../engine/lesson";
 import { isWhite, noteName, octaveOf, type Notation } from "../music/theory";
 import { keyScroll } from "../ui/layout";
 
+export type KeyboardVia = "screen-touch" | "screen-mouse" | "computer-keys";
+
 export interface KeyboardHandle {
   flash(m: number, kind: KeyFlash, ms?: number): void;
 }
@@ -12,7 +14,8 @@ interface Props {
   low: number;
   high: number;
   guide: ScoreNote[];
-  onPress(m: number): void;
+  /** Tecla pulsada y de dónde viene (dedo, ratón o letras del ordenador): los acordes lo usan (010). */
+  onPress(m: number, via: KeyboardVia): void;
   notation?: Notation;
   /** Alto de las teclas en px (170 por defecto). */
   height?: number;
@@ -85,7 +88,7 @@ export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ lo
       const m = letterMap.get(e.key.toLowerCase());
       if (m !== undefined) {
         e.preventDefault();
-        press.current(m);
+        press.current(m, "computer-keys");
       }
     };
     document.addEventListener("keydown", onKey);
@@ -118,7 +121,7 @@ export const Keyboard = forwardRef<KeyboardHandle, Props>(function Keyboard({ lo
           const key = (e.target as HTMLElement).closest<HTMLElement>(".key");
           if (!key) return;
           e.preventDefault();
-          press.current(Number(key.dataset.m));
+          press.current(Number(key.dataset.m), e.pointerType === "touch" || e.pointerType === "pen" ? "screen-touch" : "screen-mouse");
         }}
       >
         {whites.map((m, i) => (
