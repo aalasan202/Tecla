@@ -20,7 +20,7 @@ type Block = "reading" | "rhythm" | "position" | "chords";
 | `title` | `string` | p. ej. «Primeros pasos» |
 | `level` | `1 \| 2` | Nivel del repertorio al que prepara (la Unidad 3 cuenta como 2). |
 | `items` | `PathItem[]` | Orden de la ruta |
-| `test` | `SongDef[] | null` | Ejercicios de la prueba de nivel. `null` en la Unidad 1. |\| null` | Ids de ejercicio de la prueba de nivel. `null` en la Unidad 1. |
+| `test` | `SongDef[] \| null` | Ejercicios de la prueba de nivel. `null` en la Unidad 1. |
 
 ### PathItem (unión discriminada)
 
