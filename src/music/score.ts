@@ -50,6 +50,8 @@ interface Draft {
   unit: number;
   override?: Spell;
   slur?: "start" | "end";
+  /** Dedo fijo (EventOpts.f). */
+  finger?: number;
 }
 
 /**
@@ -87,7 +89,8 @@ export function buildScore(song: SongDef): Score {
           });
         } else {
           const u = unit++;
-          own = pitches.map((p) => ({ m: p.m, st: at, dt: t, h, unit: u, override: p.spell, slur: opts?.slur }));
+          const fingers = opts?.f === undefined ? [] : Array.isArray(opts.f) ? opts.f : [opts.f];
+          own = pitches.map((p, i) => ({ m: p.m, st: at, dt: t, h, unit: u, override: p.spell, slur: opts?.slur, finger: fingers[i] }));
           drafts.push(...own);
         }
         tied = opts?.tie ? { key, drafts: own } : null;
@@ -118,6 +121,10 @@ export function buildScore(song: SongDef): Score {
   clipWindows(notes);
   assignFingering(eventsOf(notes.filter((n) => n.h === "R")), { sign: 1, arpeggio: !!song.arpFingering, phraseBreaks: true, bar });
   assignFingering(eventsOf(notes.filter((n) => n.h === "L")), { sign: -1, bar });
+  // dedos fijos (012): mandan sobre la digitación sugerida
+  drafts.forEach((d, id) => {
+    if (d.finger !== undefined) notes[id].f = d.finger;
+  });
 
   const acc = accidentals(notes, keys, bar);
   const accFirst = new Set<number>();

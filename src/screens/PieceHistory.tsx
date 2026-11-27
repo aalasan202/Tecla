@@ -5,25 +5,26 @@ import { AttemptRow, pct, Stars } from "../components/AttemptRow";
 import { useHistory } from "../state/history";
 import { findSong } from "../state/library";
 import { useCourse } from "../state/useCourse";
-import { findItem } from "../course/path";
-import { itemTitle } from "./CourseMap";
+import { findItem } from "../course/state";
+import { itemTitle } from "./courseItems";
 import { hrefFor, type Route } from "../router";
 import { starsFor } from "../engine/lesson";
 
 /** A dónde lleva «Practicar» y cómo se llama la pieza si aún existe. */
 function usePieceTarget(key: string): { title: string; route: Route } | null {
-  const { units } = useCourse();
+  const { levels } = useCourse();
   if (key.startsWith("song:")) {
     const song = findSong(key.slice(5));
     return song ? { title: song.title, route: { name: "lesson", songId: song.id } } : null;
   }
   if (key.startsWith("course:test:")) {
-    const unitId = key.slice(12);
-    const i = units.findIndex((u) => u.id === unitId);
-    return i > 0 && units[i].test ? { title: `Prueba de nivel · Unidad ${i + 1}`, route: { name: "courseTest", unitId } } : null;
+    // «u2»/«u3»: pruebas de 010; la de la unidad 2 es hoy la del nivel 2 y la de la 3 se retiró
+    const raw = key.slice(12);
+    const n = raw === "u2" ? 2 : Number(raw);
+    return (n === 2 || n === 3 || n === 4) && levels[n - 1].test ? { title: `Prueba del nivel ${n}`, route: { name: "courseTest", level: n } } : null;
   }
   if (key.startsWith("course:")) {
-    const found = findItem(units, key.slice(7));
+    const found = findItem(levels, key.slice(7));
     return found ? { title: itemTitle(found.item), route: { name: "courseItem", itemId: found.item.id } } : null;
   }
   return null;

@@ -47,7 +47,7 @@ describe("rutas", () => {
     { name: "settings" },
     { name: "course" },
     { name: "courseItem", itemId: "l-pulso" },
-    { name: "courseTest", unitId: "u2" },
+    { name: "courseTest", level: 2 },
   ];
   it.each(routes.map((r) => [r.name, r] as const))("%s va y vuelve", (_n, r) => {
     expect(parseRoute(hrefFor(r))).toEqual(r);

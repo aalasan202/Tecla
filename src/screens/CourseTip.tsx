@@ -4,12 +4,9 @@ import { renderText } from "../course/text";
 import { TopBar } from "../components/TopBar";
 import { Illustration } from "../components/illustrations";
 import { IconArrow, IconClock, IconLoop, IconMetronome, IconTurtle, IconVoice } from "../components/Icons";
-import { markSeen, touchCourse, course } from "../state/course";
+import { markSeen, touchCourse } from "../state/course";
 import { settings } from "../state/settings";
-import { COURSE } from "../course/content";
-import { pathState } from "../course/path";
-import { progress } from "../state/progress";
-import { hrefFor } from "../router";
+import { hrefFor, type Route } from "../router";
 
 const ICONS: Record<IconId, ComponentType<{ size?: number }>> = {
   clock: IconClock,
@@ -20,21 +17,20 @@ const ICONS: Record<IconId, ComponentType<{ size?: number }>> = {
   metronome: IconMetronome,
 };
 
-/** Ficha de consejo: ilustración o icono, texto breve y «Entendido» (FR-017, FR-024). */
-export function CourseTip({ tip }: { tip: Tip }) {
+/** Ficha de consejo: ilustración o icono, texto breve y «Entendido», que vuelve al camino (010, FR-017). */
+export function CourseTip({ tip, back }: { tip: Tip; back: Route }) {
   const { notation } = settings.use();
   const Icon = tip.art?.kind === "icon" ? ICONS[tip.art.id] : null;
 
   const done = () => {
     markSeen(tip.id);
     touchCourse(tip.id);
-    const next = pathState(COURSE, course.get(), progress.get().best).next;
-    location.hash = next ? hrefFor({ name: "courseItem", itemId: next }) : hrefFor({ name: "course" });
+    location.hash = hrefFor(back);
   };
 
   return (
     <div className="screen course-tip">
-      <TopBar title="Consejo" back={{ name: "course" }} />
+      <TopBar title="Consejo" back={back} />
       <article className="panel tip-card">
         <div className="tip-art">
           {tip.art?.kind === "illustration" && <Illustration id={tip.art.id} />}

@@ -7,7 +7,8 @@ import { Lesson, type HandChoice, type InputVia, type LessonOptions, type Lesson
 import { BeatIndicator, type BeatHandle } from "./BeatIndicator";
 import { canNudge, emptySelection, nudge, rangeOf, tapMeasure, toggleLoop, type FragmentEdge, type FragmentSelection } from "../engine/fragment";
 import { ensureAudio, playClick, playTone, releaseAll } from "../audio/synth";
-import { useMidiInput } from "../midi/MidiProvider";
+import { useMidiContext, useMidiInput } from "../midi/MidiProvider";
+import { MIDI_HELP } from "../midi/useMidi";
 import { settings } from "../state/settings";
 import { addPractice } from "../state/progress";
 import { recordAttempt } from "../state/history";
@@ -67,8 +68,14 @@ export interface PracticeProps {
   onStep?(mode: Mode, hands: HandChoice): void;
   /** Al parar, terminar o salir de un intento (sin bucle): hasta dónde se llegó. */
   onAttempt?(mode: Mode, hands: HandChoice, progress: number): void;
-  /** Resultado de un intento completo en Tocar. */
-  onPlayResult?(result: LessonResult, hands: HandChoice): void;
+  /** Resultado de un intento completo en Tocar, con el tempo usado. */
+  onPlayResult?(result: LessonResult, hands: HandChoice, tempo: number): void;
+  /** Muestra los dedos aunque el ajuste esté desactivado (escalas del Curso, 012). */
+  forceFingers?: boolean;
+  /** Exige teclado MIDI para Aprender y Tocar (independencia de manos; constitución 1.1.0, Principio III). */
+  needsMidi?: boolean;
+  /** Tempo inicial (si no, el de la pieza). */
+  initialTempo?: number;
   /** Acciones extra en la tarjeta de resultado (p. ej. «Siguiente lección»). */
   resultActions?(result: LessonResult): ReactNode;
   /** Qué se practica: si se da, cada intento terminado y cada bucle detenido van al historial (011). */
@@ -92,6 +99,9 @@ export function Practice({
   onPlayResult,
   resultActions,
   record,
+  forceFingers = false,
+  needsMidi = false,
+  initialTempo,
 }: PracticeProps) {
   const score = useMemo(() => buildScore(song), [song]);
   const prefs = settings.use();
@@ -100,7 +110,10 @@ export function Practice({
 
   const [mode, setMode] = useState<Mode>(initialMode && modes.includes(initialMode) ? initialMode : modes[0]);
   const [hands, setHands] = useState<HandChoice>(showHands ? (initialHands ?? "both") : "both");
-  const [tempo, setTempo] = useState(song.tempo);
+  const [tempo, setTempo] = useState(initialTempo ?? song.tempo);
+  // sin teclado MIDI, un ejercicio que lo exige solo se puede escuchar (012, FR-018)
+  const midi = useMidiContext();
+  const midiBlocked = needsMidi && midi.status !== "ok";
   const [marks, setMarks] = useState<Record<number, NoteMark>>({});
   const [guide, setGuide] = useState<ScoreNote[]>([]);
   const [status, setStatus] = useState<[string, string]>(["Pulsa Empezar", ""]);
@@ -196,7 +209,7 @@ export function Practice({
           if (source && r.mode !== "listen" && !l.loop) {
             recordAttempt(makeAttempt({ source, mode: r.mode, hands, twoHands: score.twoHands, tempo: l.tempo, score: r.score ?? 0, stars: r.stars }));
           }
-          if (r.mode === "play") cb.current.onPlayResult?.(r, hands);
+          if (r.mode === "play") cb.current.onPlayResult?.(r, hands, l.tempo);
         },
       },
       {
@@ -223,6 +236,19 @@ export function Practice({
   useEffect(() => {
     if (lesson.current) lesson.current.tempo = tempo;
   }, [tempo]);
+
+  // el teclado MIDI se desconecta a mitad de un ejercicio que lo exige: se para sin puntuar ni registrar (FR-020)
+  const blockedNow = midiBlocked && mode !== "listen";
+  useEffect(() => {
+    const l = lesson.current;
+    if (!blockedNow || !l?.running) return;
+    l.stop();
+    l.reset();
+    startedAt.current = null;
+    releaseAll();
+    setRunning(false);
+    setStatus(["Teclado MIDI desconectado", ""]);
+  }, [blockedNow]);
 
   const press = useCallback((m: number, via: InputVia) => lesson.current?.input(m, via), []);
   useMidiInput(useCallback((m: number) => press(m, "midi"), [press]));
@@ -261,7 +287,7 @@ export function Practice({
       }
       return;
     }
-    if (!ready) return;
+    if (!ready || blockedNow) return;
     setResult(null);
     startedAt.current = performance.now();
     l.start();
@@ -369,7 +395,7 @@ export function Practice({
         marks={marks}
         autoIds={autoIds}
         showNames={prefs.showNames}
-        showFingers={prefs.showFingers}
+        showFingers={prefs.showFingers || forceFingers}
         notation={prefs.notation}
         loop={
           sel.on && sel.a !== null
@@ -414,6 +440,18 @@ export function Practice({
         )}
         {!result.loop && resultActions?.(result)}
       </div>
+    </div>
+  );
+  const midiNotice = midiBlocked && (
+    <div className="midi-required" role="note">
+      <p>
+        <strong>Este ejercicio necesita un teclado MIDI:</strong> con ratón o pantalla no se pueden tocar dos teclas a la vez con independencia.
+        Puedes escucharlo mientras tanto.
+      </p>
+      {midi.status !== "idle" && midi.status !== "ok" && <p className="hint">{MIDI_HELP[midi.status]}</p>}
+      <button type="button" className="btn primary" onClick={() => (ensureAudio(), midi.connect())}>
+        Conectar teclado MIDI
+      </button>
     </div>
   );
   const keyboard = <Keyboard ref={keys} low={range[0]} high={range[1]} guide={guide} onPress={press} notation={prefs.notation} fit={compact} />;
@@ -464,7 +502,7 @@ export function Practice({
             ))}
           </div>
           {handsSeg(true)}
-          <button className="btn primary" onClick={toggleRun} disabled={!running && !ready}>
+          <button className="btn primary" onClick={toggleRun} disabled={(!running && !ready) || blockedNow}>
             {running ? "Parar" : "Empezar"}
           </button>
           {allowLoop && (
@@ -513,6 +551,7 @@ export function Practice({
           <a href="#ajustes">Ajustes</a>
         </Popover>
         {pedalHelp}
+        {midiNotice}
 
         {board}
         {resultCard}
@@ -543,10 +582,11 @@ export function Practice({
       <p className="hint">{hint}</p>
 
       {pedalHelp}
+      {midiNotice}
       {board}
 
       <div className="controls">
-        <button className="btn primary" onClick={toggleRun} disabled={!running && !ready}>
+        <button className="btn primary" onClick={toggleRun} disabled={(!running && !ready) || blockedNow}>
           {running ? "Parar" : "Empezar"}
         </button>
         {atTempoField}

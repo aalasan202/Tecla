@@ -9,8 +9,8 @@ import { MiniStaff } from "../components/MiniStaff";
 import { IconCourse, IconPiano, IconPlay, IconProgress, IconSettings, IconSongs } from "../components/Icons";
 import { hrefFor } from "../router";
 import { useCourse } from "../state/useCourse";
-import { continueTarget, courseStars, findItem } from "../course/path";
-import { itemTitle } from "./CourseMap";
+import { continueTarget, courseStars, findItem, lessonProgress } from "../course/state";
+import { itemSong, itemTitle, levelLabel, recommendationRoute } from "./courseItems";
 
 const MODE_LABEL = { listen: "Paso 1 de 3: Escuchar", learn: "Paso 2 de 3: Aprender", play: "Paso 3 de 3: Tocar" } as const;
 const HANDS_LABEL = { both: "", R: " · mano derecha", L: " · mano izquierda" } as const;
@@ -32,13 +32,14 @@ export function Home() {
   const todaySeconds = p.days[dayKey()] ?? 0;
   const practicedToday = todaySeconds > 0;
   const { dailyGoal } = settings.use();
-  // Curso (010): avance, estrellas aparte (FR-037) y «Continuar» si fue lo último (FR-030)
-  const { units, cp, state } = useCourse();
-  const cStars = courseStars(units, cp);
-  const summary = state.summary;
-  const summaryUnit = summary ? units.findIndex((u) => u.id === summary.unitId) + 1 : 0;
-  const target = continueTarget(cp.last, p.last, state.next);
-  const courseNext = target.kind === "course" ? findItem(units, target.itemId) : null;
+  // Curso (012): nivel actual, estrellas aparte (010, FR-037) y «Continuar» con el recomendado (FR-011)
+  const { levels, cp, state } = useCourse();
+  const cStars = courseStars(levels, cp);
+  const currentLevel = levels[state.current - 1];
+  const lessons = lessonProgress(currentLevel, state);
+  const rec = state.recommended;
+  const target = continueTarget(cp.last, p.last, rec?.itemId ?? null);
+  const courseNext = target.kind === "course" && rec ? (rec.path === "test" ? { test: rec } : findItem(levels, rec.itemId)) : null;
 
   const courseTile = (
     <a className="tile tile-course" href="#curso">
@@ -47,7 +48,7 @@ export function Home() {
       </span>
       <span className="tile-title">Curso</span>
       <span className="tile-text">
-        {summary ? `Unidad ${summaryUnit} · ${summary.done} de ${summary.total}` : "Ruta completada"}. Aprende desde cero: lectura, ritmo, posiciones y acordes.
+        Nivel {currentLevel.n} · Lecciones {lessons.done} de {lessons.total}. Lecciones, técnica y canciones, a tu ritmo.
       </span>
       <span className="tile-meta blue">
         Curso: ★ {cStars.stars} de {cStars.max} estrellas
@@ -64,16 +65,14 @@ export function Home() {
             <div className="continue-body">
               <span className="eyebrow">Continuar el Curso</span>
               <div className="continue-title">
-                <h2>{itemTitle(courseNext.item)}</h2>
-                <p>
-                  Unidad {units.indexOf(courseNext.unit) + 1} · {courseNext.unit.title}
-                </p>
+                <h2>{"test" in courseNext ? `Prueba del nivel ${courseNext.test.level}` : itemTitle(courseNext.item)}</h2>
+                <p>{"test" in courseNext ? courseNext.test.reason : `${levelLabel(courseNext.level)} · ${rec?.reason ?? ""}`}</p>
               </div>
               <div className="continue-art">
-                <MiniStaff song={courseNext.item.type === "lesson" ? courseNext.item.lesson.exercise : (findSong(courseNext.item.type === "milestone" ? courseNext.item.songId : "") ?? song)} progress={0} />
+                <MiniStaff song={("item" in courseNext ? itemSong(courseNext.item) : undefined) ?? song} progress={0} />
               </div>
               <div className="continue-actions">
-                <a className="btn-light" href={hrefFor({ name: "courseItem", itemId: courseNext.item.id })}>
+                <a className="btn-light" href={hrefFor(rec ? recommendationRoute(rec) : { name: "course" })}>
                   <IconPlay />
                   Continuar
                 </a>

@@ -10,19 +10,37 @@ export type Route =
   | { name: "progress"; tab?: ProgressTab }
   | { name: "piece"; key: string }
   | { name: "settings" }
-  | { name: "course" }
+  /** Sin nivel ni camino: el nivel abierto más alto, en Lecciones (012). */
+  | { name: "course"; level?: CourseLevel; path?: CoursePath }
   | { name: "courseItem"; itemId: string }
-  | { name: "courseTest"; unitId: string };
+  | { name: "courseTest"; level: 2 | 3 | 4 };
 
 export type ProgressTab = "history" | "pieces";
 const TAB_PATH: Record<ProgressTab, string> = { history: "historial", pieces: "piezas" };
 
+export type CourseLevel = 1 | 2 | 3 | 4;
+export type CoursePath = "lessons" | "technique" | "songs";
+const COURSE_PATH: Record<CoursePath, string> = { lessons: "lecciones", technique: "tecnica", songs: "canciones" };
+
+function parseCourse(arg: string | undefined, arg2: string | undefined, arg3: string | undefined): Route {
+  if (arg === "prueba") {
+    // «u2» era la prueba de la unidad 2 (010): hoy, la del nivel 2
+    const n = arg2 === "u2" ? 2 : Number(arg2);
+    return n === 2 || n === 3 || n === 4 ? { name: "courseTest", level: n } : { name: "course" };
+  }
+  if (arg === "nivel") {
+    const n = Number(arg2);
+    const path = (Object.keys(COURSE_PATH) as CoursePath[]).find((p) => COURSE_PATH[p] === arg3);
+    return n >= 1 && n <= 4 && path ? { name: "course", level: n as CourseLevel, path } : { name: "course" };
+  }
+  return arg ? { name: "courseItem", itemId: decodeURIComponent(arg) } : { name: "course" };
+}
+
 export function parseRoute(hash: string): Route {
-  const [path, arg, arg2] = hash.replace(/^#\/?/, "").split("/");
+  const [path, arg, arg2, arg3] = hash.replace(/^#\/?/, "").split("/");
   switch (path) {
     case "curso":
-      if (arg === "prueba" && arg2) return { name: "courseTest", unitId: decodeURIComponent(arg2) };
-      return arg ? { name: "courseItem", itemId: decodeURIComponent(arg) } : { name: "course" };
+      return parseCourse(arg, arg2, arg3);
     case "canciones":
       return { name: "songs" };
     case "leccion":
@@ -58,11 +76,11 @@ export function hrefFor(route: Route): string {
     case "settings":
       return "#ajustes";
     case "course":
-      return "#curso";
+      return route.level && route.path ? `#curso/nivel/${route.level}/${COURSE_PATH[route.path]}` : "#curso";
     case "courseItem":
       return `#curso/${encodeURIComponent(route.itemId)}`;
     case "courseTest":
-      return `#curso/prueba/${encodeURIComponent(route.unitId)}`;
+      return `#curso/prueba/${route.level}`;
   }
 }
 

@@ -52,13 +52,13 @@ export default function App() {
       screen = <SettingsScreen />;
       break;
     case "course":
-      screen = <CourseMap />;
+      screen = <CourseMap level={route.level} path={route.path} />;
       break;
     case "courseItem":
       screen = <CourseItemScreen key={route.itemId} itemId={route.itemId} />;
       break;
     case "courseTest":
-      screen = <CourseTestScreen key={route.unitId} unitId={route.unitId} />;
+      screen = <CourseTestScreen key={route.level} level={route.level} />;
       break;
     default:
       screen = <Home />;

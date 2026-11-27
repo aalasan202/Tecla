@@ -1,33 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { COURSE } from "./content";
+import { LEVELS } from "./content";
 import { checkCourse, checkExercise, exerciseSeconds, wordCount } from "./checks";
 import { SONGS } from "../music/songs";
-import { pathState } from "./path";
 
 const REPERTOIRE = new Set(SONGS.map((s) => s.id));
 
-describe("estructura del Curso (FR-034, FR-035)", () => {
+describe("estructura del Curso (010 FR-034/035; 012 FR-021/022, SC-005)", () => {
   it("el Curso real cumple todas las reglas", () => {
-    expect(checkCourse(COURSE, REPERTOIRE)).toEqual([]);
+    expect(checkCourse(LEVELS, REPERTOIRE)).toEqual([]);
   });
 
-  it("tiene 3 unidades, 14 lecciones, 7 hitos y 13 consejos", () => {
-    const items = COURSE.flatMap((u) => u.items);
-    expect(COURSE.map((u) => u.id)).toEqual(["u1", "u2", "u3"]);
-    expect(items.filter((i) => i.type === "lesson")).toHaveLength(14);
-    expect(items.filter((i) => i.type === "milestone")).toHaveLength(7);
-    expect(items.filter((i) => i.type === "tip")).toHaveLength(13);
+  it("los niveles 1 y 2 conservan las 14 lecciones, 7 hitos y 13 consejos de 010", () => {
+    const base = LEVELS.slice(0, 2);
+    const lessons = base.flatMap((l) => l.lessons);
+    expect(LEVELS.map((l) => l.n)).toEqual([1, 2, 3, 4]);
+    expect(lessons.filter((i) => i.type === "lesson")).toHaveLength(14);
+    expect(lessons.filter((i) => i.type === "tip")).toHaveLength(13);
+    expect(base.flatMap((l) => l.songs).filter((s) => s.recommended)).toHaveLength(7);
   });
 
-  it("detecta un hito que no existe y un consejo demasiado largo", () => {
-    const broken = structuredClone(COURSE);
-    broken[0].items.push({ type: "milestone", id: "hito-nada", songId: "nada" });
-    const t = broken[0].items.find((i) => i.type === "tip")!;
+  it("detecta una canción que no existe, un consejo largo y un nivel sin prueba", () => {
+    const broken = structuredClone(LEVELS);
+    broken[0].songs.push({ type: "song", id: "hito-nada", songId: "nada", recommended: true });
+    const t = broken[0].lessons.find((i) => i.type === "tip")!;
     if (t.type === "tip") t.tip.text = "palabra ".repeat(61) + "en pantalla";
+    broken[3].test = null;
     const errs = checkCourse(broken, REPERTOIRE).join(" | ");
     expect(errs).toMatch(/nada no está en el repertorio/);
     expect(errs).toMatch(/palabras \(máximo 60\)/);
     expect(errs).toMatch(/teclado en pantalla/);
+    expect(errs).toMatch(/nivel 4: falta la prueba/);
+  });
+
+  it("detecta técnica insuficiente", () => {
+    const broken = structuredClone(LEVELS);
+    broken[2].technique = [];
+    const errs = checkCourse(broken, REPERTOIRE).join(" | ");
+    expect(errs).toMatch(/nivel 3: 0 escalas de la mano R/);
+    expect(errs).toMatch(/nivel 3: 0 ejercicios de independencia/);
   });
 
   it("detecta un ejercicio largo o de ritmo fuera de 4/4", () => {
@@ -40,12 +50,5 @@ describe("estructura del Curso (FR-034, FR-035)", () => {
   it("cuenta palabras y segundos", () => {
     expect(wordCount("Pulsa el {C} central")).toBe(4);
     expect(exerciseSeconds({ id: "curso-z", title: "z", level: "Nivel 1 · Curso", tempo: 60, n: [[60, 4]] })).toBe(4);
-  });
-
-  it("con el progreso vacío, lo primero es el consejo de postura", () => {
-    const s = pathState(COURSE, { best: {}, seen: {}, skipped: {}, last: null }, {});
-    expect(s.next).toBe("consejo-postura");
-    expect(s.items["l-posicion-do"].status).toBe("available");
-    expect(s.items["hito-cinco"].status).toBe("locked");
   });
 });

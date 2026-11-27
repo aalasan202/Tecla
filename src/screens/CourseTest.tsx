@@ -1,20 +1,23 @@
 import { useState } from "react";
-import type { Unit } from "../course/types";
+import type { Level } from "../course/types";
 import { BLOCK_LABEL } from "../course/types";
-import { testOutcome } from "../course/path";
+import { testOutcome } from "../course/state";
 import { Practice } from "../components/Practice";
 import { TopBar } from "../components/TopBar";
-import { markSkipped, recordCourseStars } from "../state/course";
+import { markLevelTest, recordCourseStars } from "../state/course";
+import { levelLabel } from "./courseItems";
 import { hrefFor } from "../router";
 import { recordAttempt } from "../state/history";
 import { makeAttempt } from "../stats/attempts";
 
 /**
- * Prueba de nivel (010, FR-020): un ejercicio por bloque trabajado antes, seguidos. Con 2★ o más
- * en todos se saltan las unidades anteriores. Sin límite de intentos.
+ * Prueba de nivel (010, FR-020; 012, FR-022): un ejercicio por tema del nivel anterior, seguidos.
+ * Con 2★ o más en todos se abre el nivel (y los anteriores). Sin límite de intentos.
  */
-export function CourseTest({ unit, index, units }: { unit: Unit; index: number; units: Unit[] }) {
-  const exercises = unit.test ?? [];
+export function CourseTest({ level }: { level: Level }) {
+  const exercises = level.test ?? [];
+  const n = level.n as 2 | 3 | 4;
+  const back = { name: "course" as const, level: n, path: "lessons" as const };
   // −1: introducción; 0…n−1: ejercicios; n: resultado
   const [step, setStep] = useState(-1);
   // estrellas de este intento (no las mejores guardadas)
@@ -25,12 +28,12 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
   if (step < 0) {
     return (
       <div className="screen course-test">
-        <TopBar title={`Prueba de nivel · Unidad ${index + 1}`} back={{ name: "course" }} />
+        <TopBar title={`Prueba del nivel ${n}`} back={back} />
         <section className="panel">
-          <h2>{unit.title}</h2>
+          <h2>{levelLabel(level)}</h2>
           <p>
-            Si ya sabes lo que enseñan las unidades anteriores, puedes saltarlas. Son {exercises.length} ejercicios cortos, uno de cada bloque. Necesitas
-            2 estrellas en Tocar en todos.
+            Si ya sabes lo que enseña el nivel {n - 1}, puedes saltarlo. Son {exercises.length} ejercicios cortos, uno de cada tema. Necesitas 2
+            estrellas en Tocar en todos.
           </p>
           <button type="button" className="btn primary" onClick={() => setStep(0)}>
             Empezar la prueba
@@ -47,20 +50,20 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
     );
     return (
       <div className="screen course-test">
-        <TopBar title={`Prueba de nivel · Unidad ${index + 1}`} back={{ name: "course" }} />
+        <TopBar title={`Prueba del nivel ${n}`} back={back} />
         <section className="panel">
           {outcome.passed ? (
             <>
               <h2>¡Prueba superada!</h2>
-              <p>La Unidad {index + 1} está abierta. Lo anterior queda disponible por si quieres repasarlo.</p>
-              <a className="btn primary" href={hrefFor({ name: "course" })}>
-                Ir al Curso
+              <p>El nivel {n} está abierto. Lo anterior queda disponible por si quieres repasarlo.</p>
+              <a className="btn primary" href={hrefFor(back)}>
+                Ir al nivel {n}
               </a>
             </>
           ) : (
             <>
               <h2>Todavía no</h2>
-              <p>Te conviene repasar {outcome.weakest ? BLOCK_LABEL[outcome.weakest].toLowerCase() : "las unidades anteriores"} antes de saltar. Puedes repetir la prueba cuando quieras.</p>
+              <p>Te conviene repasar {outcome.weakest ? BLOCK_LABEL[outcome.weakest].toLowerCase() : `el nivel ${n - 1}`} antes de saltar. Puedes repetir la prueba cuando quieras.</p>
               <div className="explain-actions">
                 <button
                   type="button"
@@ -73,7 +76,7 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
                 >
                   Repetir prueba
                 </button>
-                <a className="btn primary" href={hrefFor({ name: "course" })}>
+                <a className="btn primary" href={hrefFor({ name: "course", level: (n - 1) as 1 | 2 | 3, path: "lessons" })}>
                   Volver al Curso
                 </a>
               </div>
@@ -93,7 +96,7 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
       const ids = exercises.map((e) => e.id);
       recordAttempt(
         makeAttempt({
-          source: { key: `course:test:${unit.id}`, src: "course", title: `Prueba de nivel · Unidad ${index + 1}`, unit: `Unidad ${index + 1} · ${unit.title}` },
+          source: { key: `course:test:${n}`, src: "course", title: `Prueba del nivel ${n}`, unit: levelLabel(level) },
           mode: "play",
           hands: "both",
           twoHands: false,
@@ -103,7 +106,7 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
         }),
       );
       // aprobada: se saltan las unidades anteriores (sus elementos quedan como opcionales)
-      if (testOutcome(exercises.map((e) => e.id), got).passed) markSkipped(units.slice(0, index).map((u) => u.id));
+      if (testOutcome(exercises.map((e) => e.id), got).passed) markLevelTest(n);
     }
     setStep(step + 1);
   };
@@ -111,7 +114,7 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
     <Practice
       key={ex.id}
       song={ex}
-      back={{ name: "course" }}
+      back={back}
       modes={["listen", "play"]}
       initialMode="play"
       allowLoop={false}

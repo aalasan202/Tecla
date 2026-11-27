@@ -598,3 +598,35 @@ a.btn.primary { color: var(--on-accent); }
 .toast-top { top: max(16px, env(safe-area-inset-top)); bottom: auto; z-index: 11; }
 .tile-goal.done { color: var(--good-ink); }
 .tile-goal.done .goal-bar > span { background: var(--good); }
+
+/* ---------- Curso por niveles y caminos (012) ---------- */
+.course-rec { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; border: 2px solid var(--accent); background: var(--accent-soft); }
+.course-rec h2 { margin-top: 4px; }
+.course-rec p { margin: 2px 0 0; }
+.levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.level-chip { display: flex; flex-direction: column; gap: 2px; min-height: 52px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; position: relative; min-width: 0; }
+.level-chip:hover { border-color: var(--accent); }
+.level-chip.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.level-chip.locked { color: var(--muted); border-style: dashed; }
+.level-chip svg { position: absolute; top: 8px; right: 8px; width: 14px; height: 14px; }
+.level-n { font-weight: 700; font-size: 15px; }
+.level-title { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.level-locked { border-style: dashed; }
+.tab-count { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tab.on .tab-count { color: var(--accent-ink); }
+.path-icon.t-song { background: var(--left-soft); color: var(--left-ink); }
+.path-icon.t-scale, .path-icon.t-independence { background: var(--warm-soft); color: var(--warm-ink); }
+.p-done .path-title { color: var(--muted); }
+.p-needsMidi .path-link { border-style: dashed; }
+.tag.ok { color: var(--good-ink); border-color: var(--good); }
+.midi-required { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; margin-bottom: 10px; border-radius: 14px; border: 1px solid var(--warm); background: var(--warm-soft); color: var(--warm-ink); }
+.midi-required p { margin: 0; flex: 1 1 280px; }
+.midi-required .hint { color: inherit; }
+@media (max-width: 640px) {
+  .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* móvil apaisado: el aviso MIDI compacto para no quitar sitio a la partitura */
+@media (max-height: 500px) {
+  .midi-required { padding: 6px 12px; margin-bottom: 6px; font-size: 13px; }
+  .midi-required .hint { display: none; }
+}

@@ -32,13 +32,13 @@ Objetivo: un producto público para aprender piano desde cero con un teclado MID
 - Estadísticas, historial y rachas.✅
 
 ## v0.7 · Curso en tres caminos y técnica
-- Curso de los niveles 1 a 4. Cada nivel se abre al superar las lecciones del anterior o su prueba de nivel.
-- Dentro de cada nivel hay tres caminos libres que el alumno elige en cada momento: 1. Lecciones y consejos. 2. Técnica (escalas e independencia de manos). 3. Canciones.
-- «Siguiente recomendado»: la app propone siempre qué hacer a continuación, mezclando los tres caminos, sin bloquear el resto.
-- Lecciones y consejos nuevos para los niveles 3 y 4.
-- Ejercicios de escalas generados automáticamente, de una octava y por tonalidades (Do, Sol, Fa, Re…), con la digitación y el paso del pulgar a la vista. La digitación se enseña, pero no se puntúa: la app no puede saber qué dedo pulsa.
-- Ejercicios de independencia de manos (melodía en una mano y notas largas o acompañamiento en la otra). Solo con teclado MIDI; sin él se muestran con un aviso que lo explica (excepción al Principio III, a registrar en la constitución).
-- Se conserva el progreso del Curso actual (lecciones superadas, unidades saltadas y estrellas).
+- Curso de los niveles 1 a 4. Cada nivel se abre al superar las lecciones del anterior o su prueba de nivel.✅
+- Dentro de cada nivel hay tres caminos libres que el alumno elige en cada momento: 1. Lecciones y consejos. 2. Técnica (escalas e independencia de manos). 3. Canciones.✅
+- «Siguiente recomendado»: la app propone siempre qué hacer a continuación, mezclando los tres caminos, sin bloquear el resto.✅
+- Lecciones y consejos nuevos para los niveles 3 y 4.✅
+- Ejercicios de escalas generados automáticamente, de una octava y por tonalidades (Do, Sol, Fa, Re…), con la digitación y el paso del pulgar a la vista. La digitación se enseña, pero no se puntúa: la app no puede saber qué dedo pulsa.✅
+- Ejercicios de independencia de manos (melodía en una mano y notas largas o acompañamiento en la otra). Solo con teclado MIDI; sin él se muestran con un aviso que lo explica (excepción al Principio III, a registrar en la constitución).✅
+- Se conserva el progreso del Curso actual (lecciones superadas, unidades saltadas y estrellas).✅
 
 ## v0.8 · Lectura y repertorio largo
 - Juego de lectura rápida de notas, con repaso de las notas que más se fallan.

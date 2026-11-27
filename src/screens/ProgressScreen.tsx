@@ -10,7 +10,7 @@ import { StreakCalendar } from "../components/StreakCalendar";
 import { AttemptRow, pct, Stars } from "../components/AttemptRow";
 import { hrefFor, type ProgressTab } from "../router";
 import { useCourse } from "../state/useCourse";
-import { courseStars } from "../course/path";
+import { courseStars } from "../course/state";
 import { bestStreak, goalMet } from "../stats/streaks";
 import { periodStats } from "../stats/period";
 import type { HistoryData, Period } from "../stats/types";
@@ -60,7 +60,7 @@ function SummaryTab() {
   const p = progress.use();
   const h = useHistory();
   const { dailyGoal } = settings.use();
-  const { units, cp } = useCourse();
+  const { levels, cp } = useCourse();
   const [period, setPeriod] = useState<Period>(loadPeriod);
   const choose = (v: Period) => {
     setPeriod(v);
@@ -74,7 +74,7 @@ function SummaryTab() {
   const days = streak(p.days);
   const best = useMemo(() => bestStreak(p.days), [p.days]);
   const today = p.days[dayKey()] ?? 0;
-  const cStars = courseStars(units, cp);
+  const cStars = courseStars(levels, cp);
   const stats: [string, string][] = [
     ["Racha", `${days} ${days === 1 ? "día" : "días"}`],
     ["Mejor racha", `${best} ${best === 1 ? "día" : "días"}`],
@@ -246,7 +246,7 @@ function PiecesTab() {
   const p = progress.use();
   const h = useHistory();
   const songs = useLibrary();
-  const { units, state } = useCourse();
+  const { levels, state } = useCourse();
   const courseKeys = Object.entries(h.pieces).filter(([k]) => k.startsWith("course:"));
 
   return (
@@ -254,16 +254,18 @@ function PiecesTab() {
       <section className="panel">
         <h2>Curso</h2>
         <ul className="song-list">
-          {units.map((u, i) => {
-            const lessons = u.items.filter((it) => it.type === "lesson");
-            const passed = lessons.filter((it) => state.items[it.id].status === "passed").length;
-            const label = state.units[u.id] === "skipped" ? "Superada por prueba" : `${passed} de ${lessons.length} lecciones`;
+          {levels.map((lv) => {
+            const ls = state.levels[lv.n];
+            const pr = ls.progress;
+            const label = !ls.open
+              ? "Bloqueado"
+              : `Lecciones ${pr.lessons.done}/${pr.lessons.total} · Técnica ${pr.technique.done}/${pr.technique.total} · Canciones ${pr.songs.done}/${pr.songs.total}`;
             return (
-              <li key={u.id}>
-                <a href="#curso">
-                  Unidad {i + 1} · {u.title}
+              <li key={lv.n}>
+                <a href={hrefFor({ name: "course", level: lv.n, path: "lessons" })}>
+                  Nivel {lv.n} · {lv.title}
                 </a>
-                <span className="muted">Nivel {u.level}</span>
+                <span className="muted">{ls.byTest ? "Abierto por prueba" : ""}</span>
                 <span className="muted">{label}</span>
               </li>
             );

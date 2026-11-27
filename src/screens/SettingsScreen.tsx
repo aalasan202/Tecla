@@ -133,6 +133,17 @@ export function SettingsScreen() {
         </section>
       )}
 
+      {import.meta.env.DEV && (
+        <section className="panel">
+          <h2>Desarrollo</h2>
+          <label className="field">
+            <input type="checkbox" checked={s.devUnlock} onChange={(e) => settings.set({ devUnlock: e.target.checked })} /> Desbloquear todo el
+            Curso
+          </label>
+          <p className="muted">Abre los cuatro niveles sin cambiar el progreso guardado. Solo aparece con npm run dev.</p>
+        </section>
+      )}
+
       <section className="panel">
         <h2>Datos</h2>
         <p className="muted">El progreso se guarda solo en este navegador.</p>

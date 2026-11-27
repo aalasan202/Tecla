@@ -19,6 +19,8 @@ export interface Settings {
   pedalHelpSeen: boolean;
   /** Objetivo diario: solo informativo, no cambia la racha (011). */
   dailyGoal: DailyGoal;
+  /** Solo en desarrollo (`npm run dev`): abre todos los niveles del Curso. */
+  devUnlock: boolean;
 }
 
 export const settings = createStore<Settings>(
@@ -31,6 +33,7 @@ export const settings = createStore<Settings>(
     learnAtTempo: false,
     pedalHelpSeen: false,
     dailyGoal: 0,
+    devUnlock: false,
   },
   undefined,
   (s) => ((DAILY_GOALS as readonly number[]).includes(s.dailyGoal) ? s : { ...s, dailyGoal: 0 }),

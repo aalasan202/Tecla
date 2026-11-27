@@ -10,6 +10,11 @@ export interface EventOpts {
   slur?: "start" | "end";
   /** Ortografía forzada; en un acorde, una por altura (en el orden escrito). */
   spell?: Spell | Spell[];
+  /**
+   * Dedo fijo, 1 (pulgar) a 5 (meñique); en un acorde, uno por altura (de grave a agudo).
+   * Sustituye a la digitación sugerida (p. ej. escalas del Curso, 012).
+   */
+  f?: number | number[];
 }
 
 /**

@@ -1,10 +1,10 @@
 import type { Tip } from "./types";
 
 /**
- * Consejos prácticos de los niveles 1 y 2 (010, FR-005). Como mucho 60 palabras, escritos para
+ * Consejos prácticos de los niveles 1 a 4 (010, FR-005; 012, FR-021). Como mucho 60 palabras, escritos para
  * quien toca un piano o un teclado de verdad. Los nombres de nota van con marcas ({60}, {C}).
  */
-const tip = (id: string, level: 1 | 2, title: string, text: string, art: Tip["art"]): Tip => ({ id: `consejo-${id}`, level, title, text, art });
+const tip = (id: string, level: Tip["level"], title: string, text: string, art: Tip["art"]): Tip => ({ id: `consejo-${id}`, level, title, text, art });
 const ill = (id: Extract<Tip["art"], { kind: "illustration" }>["id"]) => ({ kind: "illustration" as const, id });
 const icon = (id: Extract<Tip["art"], { kind: "icon" }>["id"]) => ({ kind: "icon" as const, id });
 
@@ -99,5 +99,50 @@ export const TIPS = {
     "El metrónomo es tu aliado",
     "El metrónomo mantiene el pulso estable. Empieza a un tempo lento con el que no falles y súbelo poco a poco, de cinco en cinco. Si empiezas a fallar, vuelve al tempo anterior: no es retroceder, es asentar.",
     icon("metronome"),
+  ),
+  // ---------- Nivel 3 ----------
+  manosSeparadas: tip(
+    "manos-separadas",
+    3,
+    "Manos separadas primero",
+    "Antes de juntar las manos, aprende cada una por separado hasta que salga sin pensar. Después júntalas muy despacio, aunque suene lento. Si una mano se pierde, vuelve a practicarla sola un momento y prueba otra vez.",
+    icon("arrow"),
+  ),
+  escuchaPedal: tip(
+    "escucha-pedal",
+    3,
+    "Escucha el pedal",
+    "El pedal mezcla las notas que suenan. Cámbialo cuando cambia la armonía: levanta el pie justo al tocar el acorde nuevo y vuelve a pisar enseguida. Si el sonido se ensucia, es que llegas tarde al cambio.",
+    icon("voice"),
+  ),
+  frase: tip(
+    "frase",
+    3,
+    "Respira con la frase",
+    "La música se organiza en frases, como las de un texto. Al final de cada ligadura, suelta un poco la muñeca, como quien respira. Así la melodía suena cantada y la mano descansa antes de seguir.",
+    icon("clock"),
+  ),
+
+  // ---------- Nivel 4 ----------
+  sinParar: tip(
+    "sin-parar",
+    4,
+    "Lento y sin parar",
+    "Elige un tempo con el que puedas tocar la pieza entera sin detenerte, aunque falles alguna nota. Seguir el pulso importa más que corregir cada error al momento. Cuando salga entera, sube el tempo un poco.",
+    icon("turtle"),
+  ),
+  dedosDificiles: tip(
+    "dedos-dificiles",
+    4,
+    "Marca los dedos difíciles",
+    "Cuando un pasaje no sale, busca qué dedo usar en cada nota y repítelo siempre igual. Escribe el número de dedo en tu partitura en los sitios difíciles. Una digitación fija hace que la mano aprenda el camino.",
+    icon("arrow"),
+  ),
+  grabarse: tip(
+    "grabarse",
+    4,
+    "Grábate y escúchate",
+    "Mientras tocas, la atención está en las manos y se escapan detalles. Grábate con el móvil y escúchalo después, siguiendo la partitura: notarás tropiezos y cambios de tempo que no habías oído.",
+    icon("voice"),
   ),
 } satisfies Record<string, Tip>;

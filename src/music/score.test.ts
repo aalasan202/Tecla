@@ -300,3 +300,20 @@ describe("pedal (009)", () => {
     expect(buildScore(song("Nivel 4 · Bach")).pedals).toEqual([[0, 2], [2, 4]]);
   });
 });
+
+describe("dedo fijo (012)", () => {
+  const song = (n: SongDef["n"]): SongDef => ({ id: "x", title: "x", level: "Nivel 1", tempo: 80, n });
+  it("una nota con f usa ese dedo", () => {
+    const s = buildScore(song([[60, 1, { f: 3 }], [62, 1], [64, 2]]));
+    expect(s.notes[0].f).toBe(3);
+  });
+  it("las notas sin f siguen con la digitación sugerida", () => {
+    const plain = buildScore(song([[60, 1], [62, 1], [64, 2]]));
+    const mixed = buildScore(song([[60, 1, { f: 3 }], [62, 1], [64, 2]]));
+    expect(mixed.notes.slice(1).map((n) => n.f)).toEqual(plain.notes.slice(1).map((n) => n.f));
+  });
+  it("en un acorde, un dedo por altura de grave a agudo", () => {
+    const s = buildScore(song([[[60, 64, 67], 4, { f: [1, 2, 5] }]]));
+    expect(s.notes.map((n) => n.f)).toEqual([1, 2, 5]);
+  });
+});
