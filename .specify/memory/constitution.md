@@ -1,19 +1,3 @@
-<!--
-Sync Impact Report
-- Version change: (plantilla sin rellenar) → 1.0.0
-- Principios definidos (primera adopción):
-  - I. Motor separado de la interfaz
-  - II. Lógica musical probada
-  - III. Funciona sin hardware
-  - IV. Pensado para quien empieza, en cualquier pantalla
-  - V. Sencillez y datos en el dispositivo
-- Secciones añadidas: Restricciones técnicas, Flujo de trabajo y calidad, Gobernanza
-- Secciones eliminadas: ninguna
-- Plantillas (.specify/templates/*): no se modifican; leen la constitución en tiempo de ejecución.
-- TODOs diferidos: ninguno. Nota: pyproject.toml / src/tecla (Python, sin seguimiento en git)
-  no forman parte del stack declarado; confirmar si deben eliminarse.
--->
-
 # Tecla Constitution
 
 ## Core Principles
@@ -53,6 +37,17 @@ Bluetooth) es una mejora, nunca un requisito.
 - Si Web MIDI no está disponible (navegador no compatible, sin `https`), la app MUST seguir
   funcionando e informar con claridad, sin errores.
 - Una única conexión MIDI compartida para toda la app (`MidiProvider`).
+
+**Excepción: independencia de manos.** Los ejercicios que piden tocar con las dos manos a la vez
+partes distintas MAY exigir teclado MIDI, porque con ratón no se pueden pulsar dos teclas a la
+vez. Solo se admite si se cumplen todas estas condiciones:
+
+- Sin MIDI, el ejercicio se ve, pero no se puede empezar. Un aviso explica por qué y cómo
+  conectar un teclado.
+- Estos ejercicios MUST NOT bloquear el avance: no son requisito para abrir un nivel ni para
+  superar una prueba. El «Siguiente recomendado» no los propone sin MIDI.
+- El resto de la práctica sigue cumpliendo este principio.
+- Cualquier otra función que exija hardware necesita una enmienda propia de esta constitución.
 
 **Razón**: el público objetivo empieza desde cero y a menudo no tiene teclado MIDI.
 
@@ -106,7 +101,8 @@ con la privacidad.
 - Cada push a `main` despliega automáticamente (`.github/workflows/deploy.yml`); `main` MUST
   estar siempre en estado publicable.
 - Las versiones siguen la hoja de ruta (v0.4 calidad de práctica, v0.5 contenido, v0.6 curso,
-  v1.0 cuentas); cada versión publicada se registra en el historial del proyecto.
+  v0.7 curso en tres caminos y técnica, v0.8 lectura y repertorio largo, v1.0 cuentas); cada
+  versión publicada se registra en el historial del proyecto.
 
 ## Governance
 
@@ -122,4 +118,4 @@ Esta constitución prevalece sobre cualquier otra práctica o documento del proy
   complejidad añadida MUST justificarse. `/speckit-analyze` se usa para detectar
   incoherencias entre especificación, plan, tareas y esta constitución.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-16 | **Last Amended**: 2026-11-16
+**Version**: 1.1.0 | **Ratified**: 2026-11-16 | **Last Amended**: 2026-11-27
