@@ -27,7 +27,7 @@ Objetivo: un producto público para aprender piano desde cero con un teclado MID
 - Ampliar el repertorio de dominio público por niveles.✅
 - Introducir el pedal sustain en las piezas a partir del nivel 3.  Sale en la partitura pero no puntua para evaluar.✅
 
-## v0.6 · Curso y ejercicios
+## v0.6 · Curso y ejercicios✅
 - Ruta de aprendizaje: lecciones de lectura, ritmo, posiciones de mano y acordes.✅
 - Estadísticas, historial y rachas.✅
 
