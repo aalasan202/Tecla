@@ -6,11 +6,16 @@ export type Route =
   | { name: "songs" }
   | { name: "lesson"; songId: string }
   | { name: "piano" }
-  | { name: "progress" }
+  /** Sin `tab`: la pestaña Resumen (011, FR-025). */
+  | { name: "progress"; tab?: ProgressTab }
+  | { name: "piece"; key: string }
   | { name: "settings" }
   | { name: "course" }
   | { name: "courseItem"; itemId: string }
   | { name: "courseTest"; unitId: string };
+
+export type ProgressTab = "history" | "pieces";
+const TAB_PATH: Record<ProgressTab, string> = { history: "historial", pieces: "piezas" };
 
 export function parseRoute(hash: string): Route {
   const [path, arg, arg2] = hash.replace(/^#\/?/, "").split("/");
@@ -24,8 +29,11 @@ export function parseRoute(hash: string): Route {
       return arg ? { name: "lesson", songId: decodeURIComponent(arg) } : { name: "songs" };
     case "piano":
       return { name: "piano" };
-    case "progreso":
-      return { name: "progress" };
+    case "progreso": {
+      if (arg === "pieza" && arg2) return { name: "piece", key: decodeURIComponent(arg2) };
+      const tab = (Object.keys(TAB_PATH) as ProgressTab[]).find((t) => TAB_PATH[t] === arg);
+      return tab ? { name: "progress", tab } : { name: "progress" };
+    }
     case "ajustes":
       return { name: "settings" };
     default:
@@ -44,7 +52,9 @@ export function hrefFor(route: Route): string {
     case "piano":
       return "#piano";
     case "progress":
-      return "#progreso";
+      return route.tab ? `#progreso/${TAB_PATH[route.tab]}` : "#progreso";
+    case "piece":
+      return `#progreso/pieza/${encodeURIComponent(route.key)}`;
     case "settings":
       return "#ajustes";
     case "course":

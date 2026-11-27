@@ -10,6 +10,9 @@ import { ensureAudio, playClick, playTone, releaseAll } from "../audio/synth";
 import { useMidiInput } from "../midi/MidiProvider";
 import { settings } from "../state/settings";
 import { addPractice } from "../state/progress";
+import { recordAttempt } from "../state/history";
+import { makeAttempt } from "../stats/attempts";
+import type { AttemptSource } from "../stats/types";
 import { ScoreView, type StaffHandle } from "./ScoreView";
 import { Keyboard, type KeyboardHandle } from "./Keyboard";
 import { ConnectionStatus, TopBar } from "./TopBar";
@@ -68,6 +71,8 @@ export interface PracticeProps {
   onPlayResult?(result: LessonResult, hands: HandChoice): void;
   /** Acciones extra en la tarjeta de resultado (p. ej. «Siguiente lección»). */
   resultActions?(result: LessonResult): ReactNode;
+  /** Qué se practica: si se da, cada intento terminado y cada bucle detenido van al historial (011). */
+  record?: AttemptSource;
 }
 
 /** Práctica de una pieza: partitura, teclado, pasos, tempo y bucle. La usan Canciones y el Curso. */
@@ -86,6 +91,7 @@ export function Practice({
   onAttempt,
   onPlayResult,
   resultActions,
+  record,
 }: PracticeProps) {
   const score = useMemo(() => buildScore(song), [song]);
   const prefs = settings.use();
@@ -127,8 +133,8 @@ export function Practice({
   const notation = useRef(prefs.notation);
   notation.current = prefs.notation;
   // los callbacks pueden cambiar en cada render sin recrear la lección
-  const cb = useRef({ onStep, onAttempt, onPlayResult });
-  cb.current = { onStep, onAttempt, onPlayResult };
+  const cb = useRef({ onStep, onAttempt, onPlayResult, record });
+  cb.current = { onStep, onAttempt, onPlayResult, record };
   const engineRef = useRef(engine);
   engineRef.current = engine;
   const beatRef = useRef<BeatHandle>(null);
@@ -185,6 +191,11 @@ export function Practice({
           setResult(r);
           setStatus(["Lección terminada", ""]);
           saveAttempt(l);
+          const source = cb.current.record;
+          // el bucle no termina solo: se registra al detenerlo (toggleRun)
+          if (source && r.mode !== "listen" && !l.loop) {
+            recordAttempt(makeAttempt({ source, mode: r.mode, hands, twoHands: score.twoHands, tempo: l.tempo, score: r.score ?? 0, stars: r.stars }));
+          }
           if (r.mode === "play") cb.current.onPlayResult?.(r, hands);
         },
       },
@@ -228,6 +239,22 @@ export function Practice({
       setRunning(false);
       setStatus([l.loop ? "Bucle detenido" : "Pulsa Empezar", ""]);
       if (summary) {
+        // bucle detenido: un intento de fragmento con la mejor repetición (research R1)
+        const source = cb.current.record;
+        if (source && l.loop && summary.best.mode !== "listen") {
+          recordAttempt(
+            makeAttempt({
+              source,
+              mode: summary.best.mode,
+              hands: l.hands,
+              twoHands: score.twoHands,
+              tempo: l.tempo,
+              score: summary.best.score ?? 0,
+              stars: summary.best.stars,
+              frag: { from: l.loop.from + 1, to: l.loop.to + 1, reps: summary.reps },
+            }),
+          );
+        }
         const pct = (r: LessonResult) => `${Math.round((r.score ?? 0) * 100)} %`;
         const reps = `${summary.reps} ${summary.reps === 1 ? "repetición" : "repeticiones"}`;
         setResult({ ...summary.best, loop: true, message: `${reps} · mejor ${pct(summary.best)} · última ${pct(summary.last)}` });

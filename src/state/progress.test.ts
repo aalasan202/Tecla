@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { dayKey, formatDuration, lastWeek, streak } from "./progress";
 import { parseRoute, hrefFor, type Route } from "../router";
 
@@ -73,5 +73,47 @@ describe("forgetSong", () => {
     forgetSong("x");
     expect(progress.get().last).toEqual(last);
     expect(progress.get().best).toEqual({ oda: 3 });
+  });
+});
+
+describe("avisos al sumar práctica (011)", () => {
+  async function fresh() {
+    vi.resetModules();
+    const p = await import("./progress");
+    const h = await import("./history");
+    const s = await import("./settings");
+    return { ...p, ...h, settings: s.settings };
+  }
+  const now = day(2026, 11, 27);
+
+  it("al batir el récord de racha avisa una vez al día", async () => {
+    const { progress, addPractice, notice, history } = await fresh();
+    progress.set({ days: { [dayKey(day(2026, 11, 25))]: 60, [dayKey(day(2026, 11, 26))]: 60 } });
+    addPractice(30, now);
+    expect(notice.get()?.kind).toBe("record");
+    expect(notice.get()?.text).toContain("3 días");
+    expect(history.get().cheered.record).toBe("2026-11-27");
+    notice.clear();
+    addPractice(30, now);
+    expect(notice.get()).toBeNull();
+  });
+
+  it("al cruzar el objetivo diario avisa una vez", async () => {
+    const { addPractice, notice, settings, history } = await fresh();
+    settings.set({ dailyGoal: 5 });
+    addPractice(200, now);
+    expect(notice.get()).toBeNull();
+    addPractice(200, now);
+    expect(notice.get()).toMatchObject({ kind: "goal", text: "¡Objetivo de hoy cumplido!" });
+    expect(history.get().cheered.goal).toBe("2026-11-27");
+    notice.clear();
+    addPractice(200, now);
+    expect(notice.get()).toBeNull();
+  });
+
+  it("sin objetivo no hay aviso de objetivo", async () => {
+    const { addPractice, notice } = await fresh();
+    addPractice(3600, now);
+    expect(notice.get()).toBeNull();
   });
 });

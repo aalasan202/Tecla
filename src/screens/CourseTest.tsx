@@ -6,6 +6,8 @@ import { Practice } from "../components/Practice";
 import { TopBar } from "../components/TopBar";
 import { markSkipped, recordCourseStars } from "../state/course";
 import { hrefFor } from "../router";
+import { recordAttempt } from "../state/history";
+import { makeAttempt } from "../stats/attempts";
 
 /**
  * Prueba de nivel (010, FR-020): un ejercicio por bloque trabajado antes, seguidos. Con 2★ o más
@@ -17,6 +19,8 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
   const [step, setStep] = useState(-1);
   // estrellas de este intento (no las mejores guardadas)
   const [got, setGot] = useState<Record<string, number>>({});
+  // mejor nota (0–1) de cada ejercicio en esta pasada: para el historial (011, research R2)
+  const [scores, setScores] = useState<Record<string, number>>({});
 
   if (step < 0) {
     return (
@@ -63,6 +67,7 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
                   className="btn"
                   onClick={() => {
                     setGot({});
+                    setScores({});
                     setStep(0);
                   }}
                 >
@@ -84,6 +89,19 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
   const done = got[ex.id] !== undefined;
   const advance = () => {
     if (step + 1 >= exercises.length) {
+      // la prueba completa es un intento: media de las notas y el mínimo de las estrellas
+      const ids = exercises.map((e) => e.id);
+      recordAttempt(
+        makeAttempt({
+          source: { key: `course:test:${unit.id}`, src: "course", title: `Prueba de nivel · Unidad ${index + 1}`, unit: `Unidad ${index + 1} · ${unit.title}` },
+          mode: "play",
+          hands: "both",
+          twoHands: false,
+          tempo: exercises[0]?.tempo ?? 0,
+          score: ids.reduce((a, id) => a + (scores[id] ?? 0), 0) / (ids.length || 1),
+          stars: Math.min(...ids.map((id) => got[id] ?? 0)),
+        }),
+      );
       // aprobada: se saltan las unidades anteriores (sus elementos quedan como opcionales)
       if (testOutcome(exercises.map((e) => e.id), got).passed) markSkipped(units.slice(0, index).map((u) => u.id));
     }
@@ -107,6 +125,7 @@ export function CourseTest({ unit, index, units }: { unit: Unit; index: number; 
       onPlayResult={(r) => {
         recordCourseStars(ex.id, r.stars);
         setGot((g) => ({ ...g, [ex.id]: Math.max(g[ex.id] ?? 0, r.stars) }));
+        setScores((g) => ({ ...g, [ex.id]: Math.max(g[ex.id] ?? 0, r.score ?? 0) }));
       }}
       resultActions={(r) =>
         r.mode === "play" || done ? (

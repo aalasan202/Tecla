@@ -1,5 +1,10 @@
 import { createStore } from "./store";
 import type { HandChoice, Mode } from "../engine/lesson";
+import { dayKey, milestones, streak } from "../stats/streaks";
+import { forgetHistory, history, notice } from "./history";
+import { settings } from "./settings";
+
+export { dayKey, streak };
 
 export interface LastSession {
   songId: string;
@@ -29,9 +34,6 @@ export const progress = createStore<ProgressData>("tecla-progress", { best: {}, 
   }
 });
 
-export const dayKey = (d: Date = new Date()): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
 export function recordStars(songId: string, stars: number): void {
   progress.set((p) => ((p.best[songId] ?? 0) >= stars ? {} : { best: { ...p.best, [songId]: stars } }));
 }
@@ -40,24 +42,18 @@ export function recordSession(session: Omit<LastSession, "at">): void {
   progress.set({ last: { ...session, at: Date.now() } });
 }
 
-/** Suma tiempo de práctica al día de hoy (se ignoran sesiones absurdas). */
-export function addPractice(seconds: number): void {
+/** Suma tiempo de práctica al día de hoy (se ignoran sesiones absurdas) y avisa de récord u objetivo (011). */
+export function addPractice(seconds: number, now: Date = new Date()): void {
   if (!(seconds > 1)) return;
-  const key = dayKey();
+  const key = dayKey(now);
   const s = Math.min(seconds, 3600);
+  const before = progress.get().days;
   progress.set((p) => ({ days: { ...p.days, [key]: (p.days[key] ?? 0) + s } }));
-}
-
-/** Días seguidos con práctica, contando hoy o, si hoy aún no, desde ayer. */
-export function streak(days: Record<string, number>, today: Date = new Date()): number {
-  const d = new Date(today);
-  if (!days[dayKey(d)]) d.setDate(d.getDate() - 1);
-  let n = 0;
-  while (days[dayKey(d)]) {
-    n++;
-    d.setDate(d.getDate() - 1);
+  const after = progress.get().days;
+  for (const m of milestones(before, after, settings.get().dailyGoal, now, history.get().cheered)) {
+    history.set((h) => ({ cheered: { ...h.cheered, [m]: key } }));
+    notice.push(m === "record" ? { kind: m, text: `¡Nueva mejor racha: ${streak(after, now)} días!` } : { kind: m, text: "¡Objetivo de hoy cumplido!" });
   }
-  return n;
 }
 
 /** Los últimos 7 días, del más antiguo a hoy. */
@@ -85,4 +81,5 @@ export function forgetSong(id: string): void {
     delete best[id];
     return { best, last: p.last?.songId === id ? null : p.last };
   });
+  forgetHistory(`song:${id}`);
 }

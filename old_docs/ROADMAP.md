@@ -28,9 +28,15 @@ Objetivo: un producto público para aprender piano desde cero con un teclado MID
 - Introducir el pedal sustain en las piezas a partir del nivel 3.  Sale en la partitura pero no puntua para evaluar.✅
 
 ## v0.6 · Curso y ejercicios
-- Ruta de aprendizaje: lecciones de lectura, ritmo, posiciones de mano y acordes.
+- Ruta de aprendizaje: lecciones de lectura, ritmo, posiciones de mano y acordes.✅
+- Estadísticas, historial y rachas.✅
+
+## v0.7 · Ampliación de ejercicios
+- Dentro de cada nivel del curso, hay tres caminos que el alumno puede seguir simultáneamente: 1. Consejos y lecciones. 2. Ejercicios de escalas/independencia de manos y juegos de lectura. 3. Aprender canciones.
 - Juego de lectura rápida de notas.
-- Estadísticas, historial y rachas.
+- Ejercicios de escalas.
+- Ejercicios para trabajar la independecia entre manos.
+- Las canciones largas se aprenden en tres-cuatro lecciones, primero por partes y al final todo junto.
 
 ## v1.0 · Cuentas
 - Registro e inicio de sesión (Supabase) y progreso sincronizado entre dispositivos.

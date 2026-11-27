@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from "react";
 
-/** Almacén mínimo persistido en localStorage, con suscripción para React. */
-export function createStore<T extends object>(key: string, defaults: T, migrate?: (raw: unknown) => Partial<T>) {
-  let value: T = load();
+/**
+ * Almacén mínimo persistido en localStorage, con suscripción para React.
+ * `sanitize` corrige datos guardados mal formados al cargar (p. ej. el historial, 011). */
+export function createStore<T extends object>(key: string, defaults: T, migrate?: (raw: unknown) => Partial<T>, sanitize?: (value: T) => T) {
+  let value: T = sanitize ? sanitize(load()) : load();
   const listeners = new Set<() => void>();
 
   function load(): T {

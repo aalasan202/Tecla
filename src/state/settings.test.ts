@@ -44,3 +44,23 @@ describe("explicación del pedal (009)", () => {
     expect((await loadSettings()).get().pedalHelpSeen).toBe(true);
   });
 });
+
+describe("objetivo diario (011)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("por defecto está desactivado, también con ajustes antiguos", async () => {
+    vi.stubGlobal("localStorage", fakeStorage({ "tecla-settings": JSON.stringify({ notation: "latin" }) }));
+    expect((await loadSettings()).get().dailyGoal).toBe(0);
+  });
+
+  it("se recuerda entre sesiones", async () => {
+    vi.stubGlobal("localStorage", fakeStorage());
+    (await loadSettings()).set({ dailyGoal: 15 });
+    expect((await loadSettings()).get().dailyGoal).toBe(15);
+  });
+
+  it("un valor no válido se trata como desactivado", async () => {
+    vi.stubGlobal("localStorage", fakeStorage({ "tecla-settings": JSON.stringify({ dailyGoal: 7 }) }));
+    expect((await loadSettings()).get().dailyGoal).toBe(0);
+  });
+});

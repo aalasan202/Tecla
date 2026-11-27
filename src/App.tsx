@@ -11,6 +11,8 @@ import { ProgressScreen } from "./screens/ProgressScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { IconRotate } from "./components/Icons";
 import { PwaToast } from "./components/PwaToast";
+import { Toast } from "./components/Toast";
+import { PieceHistory } from "./screens/PieceHistory";
 import { CourseMap } from "./screens/CourseMap";
 import { CourseItemScreen, CourseTestScreen } from "./screens/CourseItem";
 
@@ -41,7 +43,10 @@ export default function App() {
       screen = <FreePiano />;
       break;
     case "progress":
-      screen = <ProgressScreen />;
+      screen = <ProgressScreen tab={route.tab} />;
+      break;
+    case "piece":
+      screen = <PieceHistory key={route.key} pieceKey={route.key} />;
       break;
     case "settings":
       screen = <SettingsScreen />;
@@ -63,6 +68,7 @@ export default function App() {
     <MidiProvider onPedal={setSustain}>
       <div className="app">{screen}</div>
       <PwaToast route={route} />
+      <Toast />
       <div className="rotate">
         <span className="rotate-brand">Tecla</span>
         <IconRotate />

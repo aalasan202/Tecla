@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Lesson } from "../course/types";
+import type { Lesson, Unit } from "../course/types";
 import { Practice } from "../components/Practice";
 import { ExplainPageView } from "../components/ExplainPage";
 import { TopBar } from "../components/TopBar";
@@ -8,6 +8,12 @@ import { useCourse } from "../state/useCourse";
 import { findItem, PASS_STARS } from "../course/path";
 import { hrefFor } from "../router";
 import { itemTitle } from "./CourseMap";
+
+/** «Unidad N · título» de la unidad que contiene un elemento (historial, 011). */
+export function unitLabel(units: Unit[], itemId: string): string | undefined {
+  const found = findItem(units, itemId);
+  return found ? `Unidad ${units.indexOf(found.unit) + 1} · ${found.unit.title}` : undefined;
+}
 
 /** Lección del Curso: 1–2 pantallas de explicación y después el ejercicio (FR-007, FR-008). */
 export function CourseLesson({ lesson }: { lesson: Lesson }) {
@@ -65,6 +71,7 @@ export function CourseLesson({ lesson }: { lesson: Lesson }) {
             ? { play: "Pulsa las tres notas a la vez. Con el ratón, una tras otra y rápido." }
             : undefined
       }
+      record={{ key: `course:${lesson.id}`, src: "course", title: lesson.title, unit: unitLabel(units, lesson.id) }}
       onStep={() => touchCourse(lesson.id)}
       onPlayResult={(r) => {
         recordCourseStars(lesson.id, r.stars);

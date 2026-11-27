@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { settings, type Theme } from "../state/settings";
+import { DAILY_GOALS, settings, type Theme } from "../state/settings";
 import { progress } from "../state/progress";
+import { history } from "../state/history";
 import { course } from "../state/course";
 import { useMidiContext } from "../midi/MidiProvider";
 import { MIDI_HELP } from "../midi/useMidi";
@@ -97,6 +98,21 @@ export function SettingsScreen() {
         </fieldset>
       </section>
 
+      <section className="panel">
+        <h2>Práctica</h2>
+        <fieldset className="option">
+          <legend>Objetivo diario</legend>
+          <div className="seg" role="group">
+            {DAILY_GOALS.map((v) => (
+              <button key={v} aria-pressed={s.dailyGoal === v} onClick={() => settings.set({ dailyGoal: v })}>
+                {v ? `${v} min` : "Desactivado"}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <p className="muted">Solo te muestra cuánto llevas cada día; la racha cuenta cualquier día con práctica.</p>
+      </section>
+
       {install !== "installed" && (
         <section className="panel">
           <h2>Instalar Tecla</h2>
@@ -125,12 +141,13 @@ export function SettingsScreen() {
         )}
         {confirmReset ? (
           <div className="row">
-            <span>¿Borrar estrellas, racha, tiempo de práctica y el avance del Curso?</span>
+            <span>¿Borrar estrellas, racha, historial, estadísticas, tiempo de práctica y el avance del Curso?</span>
             <button
               className="btn danger"
               onClick={() => {
                 progress.reset();
                 course.reset();
+                history.reset();
                 setConfirmReset(false);
               }}
             >

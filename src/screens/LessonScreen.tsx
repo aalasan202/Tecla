@@ -45,6 +45,7 @@ function LessonView({ songId, back, onSession }: { songId: string; back: Route; 
       back={back}
       initialMode={resume?.mode}
       initialHands={resume?.hands}
+      record={{ key: `song:${songId}`, src: "song", title: song.title }}
       onStep={(mode, hands) => {
         recordSession({ songId, mode, hands, progress: resume && resume.mode === mode && resume.hands === hands ? resume.progress : 0 });
         onSession?.();

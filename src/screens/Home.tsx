@@ -1,6 +1,8 @@
 import { SONGS } from "../music/songs";
 import { buildScore, measureCount } from "../music/score";
-import { progress, lastWeek, streak } from "../state/progress";
+import { dayKey, progress, lastWeek, streak } from "../state/progress";
+import { settings } from "../state/settings";
+import { goalMet } from "../stats/streaks";
 import { findSong, repertoireStars, resolveSongId } from "../state/library";
 import { TopBar } from "../components/TopBar";
 import { MiniStaff } from "../components/MiniStaff";
@@ -26,6 +28,10 @@ export function Home() {
   const maxStars = SONGS.length * 3;
   const week = lastWeek(p.days);
   const days = streak(p.days);
+  // 011: recordatorio de racha (FR-013) y objetivo de hoy (FR-020)
+  const todaySeconds = p.days[dayKey()] ?? 0;
+  const practicedToday = todaySeconds > 0;
+  const { dailyGoal } = settings.use();
   // Curso (010): avance, estrellas aparte (FR-037) y «Continuar» si fue lo último (FR-030)
   const { units, cp, state } = useCourse();
   const cStars = courseStars(units, cp);
@@ -143,7 +149,21 @@ export function Home() {
               <IconProgress />
             </span>
             <span className="tile-title">Progreso</span>
-            <span className="tile-text">{days ? `Racha de ${days} ${days === 1 ? "día" : "días"}.` : "Practica hoy para empezar una racha."}</span>
+            <span className="tile-text">
+              {!days
+                ? "Practica hoy para empezar una racha."
+                : practicedToday
+                  ? `Racha de ${days} ${days === 1 ? "día" : "días"}.`
+                  : `Racha de ${days} ${days === 1 ? "día" : "días"}. Practica hoy para mantenerla.`}
+            </span>
+            {dailyGoal > 0 && (
+              <span className={goalMet(todaySeconds, dailyGoal) ? "tile-goal done" : "tile-goal"}>
+                <span>{goalMet(todaySeconds, dailyGoal) ? "Objetivo de hoy cumplido" : `Hoy: ${Math.floor(todaySeconds / 60)} de ${dailyGoal} min`}</span>
+                <span className="goal-bar" role="progressbar" aria-label="Objetivo de hoy" aria-valuemin={0} aria-valuemax={dailyGoal} aria-valuenow={Math.min(dailyGoal, Math.floor(todaySeconds / 60))}>
+                  <span style={{ width: `${Math.min(100, (todaySeconds / (dailyGoal * 60)) * 100)}%` }} />
+                </span>
+              </span>
+            )}
             <span className="week" aria-label={`Has practicado ${week.filter((d) => d.seconds).length} de los últimos 7 días`}>
               {week.map((d) => (
                 <span key={d.key} className={d.seconds ? "on" : ""} />
